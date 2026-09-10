@@ -1,0 +1,78 @@
+Update my finance app so Bills, Debts, and Savings Goals calculate and display how long they will take based on the amounts the user enters.
+
+### Bills
+
+Keep the current fields:
+
+* Name
+* Amount
+* Due Date
+* Frequency: Weekly, Monthly, Yearly, One-time
+
+For recurring bills, show the next payment date and clearly indicate that the bill is recurring. If the user enters an optional End Date, calculate and display how long the bill will continue, for example:
+“Ends in 8 months”
+or
+“Ends on May 15, 2027”.
+
+For One-time bills, simply show the due date and how many days are remaining.
+
+### Debt
+
+Add:
+
+* Debt Name
+* Total Debt Amount
+* Amount the user plans to pay each month
+* Due/Start Date (if needed)
+
+Automatically calculate:
+
+* Estimated number of months until the debt is fully paid
+* Estimated payoff date
+* Remaining balance
+* Progress percentage
+
+Example:
+Total Debt: 1,200 KWD
+Monthly Payment: 200 KWD
+→ “Estimated payoff: 6 months”
+→ “Estimated payoff date: March 2027”
+
+### Savings Goal
+
+Add:
+
+* Goal Name
+* Target Amount
+* Current Saved Amount
+* Amount the user plans to save each month
+
+Automatically calculate:
+
+* Remaining amount
+* Estimated number of months to reach the goal
+* Estimated completion date
+* Progress percentage
+
+Example:
+Goal: New Laptop
+Target: 1,200 KWD
+Saved: 400 KWD
+Monthly Saving: 200 KWD
+→ Remaining: 800 KWD
+→ “Estimated completion: 4 months”
+→ “Target date: January 2027”
+
+### Important
+
+* Recalculate everything automatically whenever the user changes an amount.
+* Handle decimal amounts correctly.
+* Do not allow negative amounts or zero monthly payments when a calculation requires a payment amount.
+* If the amount is not enough to calculate a completion date, show a helpful message instead of an error.
+* Make the calculations accurate for Weekly, Monthly, Yearly, and One-time bills.
+* Keep the existing UI/design.
+* Make the new information clean and easy to understand.
+* Make it fully responsive on desktop and mobile.
+* Support both English and Arabic, including RTL layout.
+* Make sure it works correctly in both Light Mode and Dark Mode.
+* Test all calculations and make sure existing functionality is not broken.
