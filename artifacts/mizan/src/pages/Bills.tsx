@@ -74,27 +74,27 @@ export default function Bills() {
       </header>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{t('add_bill')}</DialogTitle>
           </DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="name">{t('name')}</Label>
-              <Input id="name" name="name" required placeholder="e.g. Electricity" />
+              <Input id="name" name="name" required placeholder="e.g. Electricity" className="h-11 w-full min-w-0" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="amount">{t('amount')}</Label>
-              <Input id="amount" name="amount" type="number" step="0.01" required placeholder="0.00" />
+              <Input id="amount" name="amount" type="number" inputMode="decimal" step="0.01" required placeholder="0.00" className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="dueDate">{t('due_date')}</Label>
-              <Input id="dueDate" name="dueDate" type="date" required />
+              <Input id="dueDate" name="dueDate" type="date" required className="h-11 w-full min-w-0" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="frequency">{t('frequency')}</Label>
               <Select name="frequency" defaultValue="monthly">
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full min-w-0"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="monthly">{t('monthly')}</SelectItem>
                   <SelectItem value="yearly">{t('yearly')}</SelectItem>
@@ -130,21 +130,21 @@ export default function Bills() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {bills?.map(bill => (
-            <Card key={bill.id} className="rounded-3xl overflow-hidden transition-all hover:shadow-md group">
+            <Card key={bill.id} className="h-full min-w-0 rounded-3xl overflow-hidden transition-all hover:shadow-md group">
               <div className={`h-2 w-full ${bill.status === 'overdue' && !bill.paid ? 'bg-destructive' : bill.paid ? 'bg-primary' : 'bg-accent'}`} />
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold">{bill.name}</h3>
-                    <p className="text-2xl font-serif mt-1 text-foreground">{formatCurrency(bill.amount)}</p>
+              <CardContent className="p-6 h-full min-w-0 flex flex-col">
+                <div className="flex justify-between items-start gap-3 mb-6 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xl font-bold break-words [overflow-wrap:anywhere]">{bill.name}</h3>
+                    <p className="text-xl sm:text-2xl leading-tight font-serif mt-1 text-foreground tabular-nums break-words [overflow-wrap:anywhere]">{formatCurrency(bill.amount)}</p>
                   </div>
-                  <Badge variant={bill.paid ? 'success' : bill.status === 'overdue' ? 'destructive' : 'secondary'} className="px-3 py-1">
+                  <Badge variant={bill.paid ? 'success' : bill.status === 'overdue' ? 'destructive' : 'secondary'} className="px-3 py-1 shrink-0">
                     {bill.paid ? t('paid') : bill.status === 'overdue' ? t('overdue') : t('pending')}
                   </Badge>
                 </div>
                 
-                <div className="flex items-center text-sm text-muted-foreground mb-6 gap-2">
-                  <Calendar className="h-4 w-4" />
+                <div className="flex flex-wrap items-center text-sm text-muted-foreground mb-6 gap-2 min-w-0">
+                  <Calendar className="h-4 w-4 shrink-0" />
                   <span>Due: {new Date(bill.dueDate).toLocaleDateString()}</span>
                   <span className="px-2">&bull;</span>
                   <span className="capitalize">{t(bill.frequency)}</span>

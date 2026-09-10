@@ -6,6 +6,22 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/providers/language-provider';
 import { useTheme } from '@/providers/theme-provider';
 
+const currencyLabels: Record<string, string> = {
+  USD: "USD ($)",
+  EUR: "EUR (€)",
+  GBP: "GBP (£)",
+  AED: "AED",
+  SAR: "SAR",
+  KWD: "KWD (KD)",
+  EGP: "EGP",
+};
+
+const themeLabels: Record<string, string> = {
+  light: "Light",
+  dark: "Dark",
+  system: "System",
+};
+
 export default function Settings() {
   const { t } = useLanguage();
   const { setTheme: setContextTheme } = useTheme();
@@ -65,15 +81,15 @@ export default function Settings() {
                 step="0.01" 
                 className="h-12 text-lg"
                 value={formData.monthlyIncome} 
-                onChange={e => setFormData({ ...formData, monthlyIncome: Number(e.target.value) })}
+                onChange={e => setFormData(current => ({ ...current, monthlyIncome: Number(e.target.value) }))}
               />
               <p className="text-sm text-muted-foreground">Used to calculate dashboard insights.</p>
             </div>
 
             <div className="space-y-2">
               <Label className="text-base">{t('currency')}</Label>
-              <Select value={formData.preferredCurrency} onValueChange={v => setFormData({ ...formData, preferredCurrency: v })}>
-                <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+              <Select value={formData.preferredCurrency} onValueChange={v => setFormData(current => ({ ...current, preferredCurrency: v }))}>
+                <SelectTrigger className="h-12"><SelectValue>{currencyLabels[formData.preferredCurrency]}</SelectValue></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
@@ -88,8 +104,8 @@ export default function Settings() {
 
             <div className="space-y-2">
               <Label className="text-base">{t('theme')}</Label>
-              <Select value={formData.theme} onValueChange={v => setFormData({ ...formData, theme: v })}>
-                <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+              <Select value={formData.theme} onValueChange={v => setFormData(current => ({ ...current, theme: v }))}>
+                <SelectTrigger className="h-12"><SelectValue>{themeLabels[formData.theme]}</SelectValue></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="light">Light</SelectItem>
                   <SelectItem value="dark">Dark</SelectItem>

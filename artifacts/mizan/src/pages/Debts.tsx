@@ -77,24 +77,24 @@ export default function Debts() {
 
       {/* CREATE DIALOG */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md overflow-x-hidden">
           <DialogHeader><DialogTitle>{t('add_debt')}</DialogTitle></DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label>{t('name')}</Label>
-              <Input name="name" required placeholder="e.g. Student Loan" />
+              <Input name="name" required placeholder="e.g. Student Loan" className="h-11 w-full min-w-0" />
             </div>
             <div className="space-y-2">
               <Label>{t('total_amount')}</Label>
-              <Input name="totalAmount" type="number" step="0.01" required />
+              <Input name="totalAmount" type="number" inputMode="decimal" step="0.01" required className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>{t('monthly_payment')}</Label>
-              <Input name="monthlyPayment" type="number" step="0.01" required />
+              <Input name="monthlyPayment" type="number" inputMode="decimal" step="0.01" required className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>Target Payoff Date</Label>
-              <Input name="dueDate" type="date" required />
+              <Input name="dueDate" type="date" required className="h-11 w-full min-w-0" />
             </div>
             <Button type="submit" className="w-full mt-6" disabled={createDebt.isPending}>{t('save')}</Button>
           </form>
@@ -103,12 +103,12 @@ export default function Debts() {
 
       {/* PAYMENT DIALOG */}
       <Dialog open={!!paymentOpenId} onOpenChange={(open) => !open && setPaymentOpenId(null)}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md overflow-x-hidden">
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
           <form onSubmit={onPayment} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label>{t('amount')}</Label>
-              <Input name="amount" type="number" step="0.01" required placeholder="0.00" />
+              <Input name="amount" type="number" inputMode="decimal" step="0.01" required placeholder="0.00" className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <Button type="submit" className="w-full mt-6" disabled={recordPayment.isPending}>Submit Payment</Button>
           </form>
@@ -135,12 +135,12 @@ export default function Debts() {
       ) : (
         <div className="grid gap-6">
           {debts?.map(debt => (
-            <Card key={debt.id} className="rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row gap-8 items-center">
-                <div className="flex-1 w-full space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-xl font-bold">{debt.name}</h3>
+            <Card key={debt.id} className="min-w-0 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch sm:items-center min-w-0">
+                <div className="flex-1 min-w-0 w-full space-y-4">
+                  <div className="flex justify-between items-start gap-3 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xl font-bold break-words [overflow-wrap:anywhere]">{debt.name}</h3>
                       <p className="text-muted-foreground text-sm mt-1">Target: {new Date(debt.dueDate).toLocaleDateString()}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
@@ -149,17 +149,17 @@ export default function Debts() {
                   </div>
                   
                   <div>
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-3xl font-serif text-foreground font-bold">{formatCurrency(debt.remainingAmount)} <span className="text-base font-sans text-muted-foreground font-normal">left</span></span>
-                      <span className="text-sm font-medium">{Math.round(debt.progress)}% Paid</span>
+                    <div className="flex flex-col xs:flex-row justify-between items-start xs:items-end gap-2 mb-2 min-w-0">
+                      <span className="max-w-full text-[clamp(0.9rem,4.5vw,1.875rem)] sm:text-3xl tracking-tight leading-tight font-serif text-foreground font-bold tabular-nums whitespace-nowrap">{formatCurrency(debt.remainingAmount)} <span className="text-base font-sans text-muted-foreground font-normal">left</span></span>
+                      <span className="text-sm font-medium shrink-0">{Math.round(debt.progress)}% Paid</span>
                     </div>
                     <Progress value={debt.progress} className="h-3" />
                   </div>
                 </div>
                 
-                <div className="w-full sm:w-auto bg-muted/50 p-6 rounded-2xl flex flex-col items-center justify-center min-w-[200px] border border-border/50">
+                <div className="w-full sm:w-52 sm:shrink-0 bg-muted/50 p-6 rounded-2xl flex flex-col items-center justify-center min-w-0 border border-border/50">
                   <p className="text-sm text-muted-foreground mb-1">{t('monthly_payment')}</p>
-                  <p className="text-xl font-bold text-foreground mb-4">{formatCurrency(debt.monthlyPayment)}</p>
+                  <p className="max-w-full text-lg sm:text-xl leading-tight text-center font-bold text-foreground mb-4 tabular-nums break-words [overflow-wrap:anywhere]">{formatCurrency(debt.monthlyPayment)}</p>
                   <Button className="w-full rounded-xl" onClick={() => setPaymentOpenId(debt.id)}>
                     <HandCoins className="h-4 w-4 me-2" /> Pay
                   </Button>

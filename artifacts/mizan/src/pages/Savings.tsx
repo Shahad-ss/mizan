@@ -76,24 +76,24 @@ export default function Savings() {
 
       {/* CREATE DIALOG */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md overflow-x-hidden">
           <DialogHeader><DialogTitle>{t('add_savings')}</DialogTitle></DialogHeader>
           <form onSubmit={onSubmit} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label>{t('name')}</Label>
-              <Input name="name" required placeholder="e.g. Dream Vacation" />
+              <Input name="name" required placeholder="e.g. Dream Vacation" className="h-11 w-full min-w-0" />
             </div>
             <div className="space-y-2">
               <Label>{t('target_amount')}</Label>
-              <Input name="targetAmount" type="number" step="0.01" required />
+              <Input name="targetAmount" type="number" inputMode="decimal" step="0.01" required className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>Initial Deposit (Optional)</Label>
-              <Input name="currentAmount" type="number" step="0.01" defaultValue="0" />
+              <Input name="currentAmount" type="number" inputMode="decimal" step="0.01" defaultValue="0" className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>{t('target_date')}</Label>
-              <Input name="targetDate" type="date" required />
+              <Input name="targetDate" type="date" required className="h-11 w-full min-w-0" />
             </div>
             <Button type="submit" className="w-full mt-6" disabled={createGoal.isPending}>{t('save')}</Button>
           </form>
@@ -102,12 +102,12 @@ export default function Savings() {
 
       {/* CONTRIBUTE DIALOG */}
       <Dialog open={!!contribOpenId} onOpenChange={(open) => !open && setContribOpenId(null)}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md overflow-x-hidden">
           <DialogHeader><DialogTitle>Add Contribution</DialogTitle></DialogHeader>
           <form onSubmit={onContribute} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label>{t('amount')}</Label>
-              <Input name="amount" type="number" step="0.01" required placeholder="0.00" />
+              <Input name="amount" type="number" inputMode="decimal" step="0.01" required placeholder="0.00" className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <Button type="submit" className="w-full mt-6" disabled={addContrib.isPending}>Add Funds</Button>
           </form>
@@ -134,12 +134,12 @@ export default function Savings() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {goals?.map(goal => (
-            <Card key={goal.id} className="rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
-              <CardContent className="p-6 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold">{goal.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">Goal: {formatCurrency(goal.targetAmount)}</p>
+            <Card key={goal.id} className="h-full min-w-0 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
+              <CardContent className="p-6 min-w-0 flex-1 flex flex-col">
+                <div className="flex justify-between items-start gap-3 mb-6 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xl font-bold break-words [overflow-wrap:anywhere]">{goal.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1 tabular-nums break-words [overflow-wrap:anywhere]">Goal: {formatCurrency(goal.targetAmount)}</p>
                   </div>
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(goal.id)}>
                     <Trash2 className="h-4 w-4" />
@@ -147,15 +147,15 @@ export default function Savings() {
                 </div>
                 
                 <div className="mb-6 flex-1 flex flex-col justify-center">
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-3xl font-serif text-foreground font-bold">{formatCurrency(goal.currentAmount)}</span>
-                    <span className="text-sm font-medium px-2 py-1 bg-secondary rounded-lg">{Math.round(goal.progress)}%</span>
+                  <div className="flex flex-col xs:flex-row justify-between items-start xs:items-end gap-2 mb-2 min-w-0">
+                    <span className="max-w-full text-[clamp(0.9rem,4.5vw,1.875rem)] sm:text-3xl tracking-tight leading-tight font-serif text-foreground font-bold tabular-nums whitespace-nowrap">{formatCurrency(goal.currentAmount)}</span>
+                    <span className="text-sm font-medium px-2 py-1 bg-secondary rounded-lg shrink-0">{Math.round(goal.progress)}%</span>
                   </div>
                   <Progress value={goal.progress} className="h-3 bg-secondary/50" />
                 </div>
                 
-                <div className="flex items-center justify-between border-t pt-4 mt-auto">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 mt-auto">
+                  <div className="text-sm text-muted-foreground min-w-0">
                     Target: {new Date(goal.targetDate).toLocaleDateString()}
                   </div>
                   <Button variant="outline" className="rounded-xl px-6" onClick={() => setContribOpenId(goal.id)}>
