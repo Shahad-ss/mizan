@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Mizan Personal Finance"
+description = "A bilingual personal finance workspace for managing bills, debt, and savings goals with clear progress and gentle reminders."
+version = "1.0.0"
+id = "artifacts/mizan"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21712
+
+[services.development]
+run = "pnpm --filter @workspace/mizan run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mizan", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mizan/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21712"
+BASE_PATH = "/"

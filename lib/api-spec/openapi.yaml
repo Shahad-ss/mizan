@@ -10,6 +10,16 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: User profile and preferences
+  - name: dashboard
+    description: Financial summary
+  - name: bills
+    description: Bill tracking
+  - name: debts
+    description: Debt tracking
+  - name: savings
+    description: Savings goal tracking
 paths:
   /healthz:
     get:
@@ -24,7 +34,276 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get the signed-in user's profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update profile preferences and monthly income
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get a financial overview
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /bills:
+    get:
+      operationId: listBills
+      tags: [bills]
+      summary: List the user's bills
+      responses:
+        "200":
+          description: Bills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bill"
+    post:
+      operationId: createBill
+      tags: [bills]
+      summary: Create a bill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillInput"
+      responses:
+        "201":
+          description: Created bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+  /bills/{id}:
+    patch:
+      operationId: updateBill
+      tags: [bills]
+      summary: Update a bill
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillUpdate"
+      responses:
+        "200":
+          description: Updated bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+    delete:
+      operationId: deleteBill
+      tags: [bills]
+      summary: Delete a bill
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /debts:
+    get:
+      operationId: listDebts
+      tags: [debts]
+      summary: List the user's debts
+      responses:
+        "200":
+          description: Debts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Debt"
+    post:
+      operationId: createDebt
+      tags: [debts]
+      summary: Create a debt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebtInput"
+      responses:
+        "201":
+          description: Created debt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Debt"
+  /debts/{id}:
+    patch:
+      operationId: updateDebt
+      tags: [debts]
+      summary: Update a debt
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebtUpdate"
+      responses:
+        "200":
+          description: Updated debt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Debt"
+    delete:
+      operationId: deleteDebt
+      tags: [debts]
+      summary: Delete a debt
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /debts/{id}/payments:
+    post:
+      operationId: recordDebtPayment
+      tags: [debts]
+      summary: Record a debt payment
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebtPaymentInput"
+      responses:
+        "200":
+          description: Updated debt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Debt"
+  /savings-goals:
+    get:
+      operationId: listSavingsGoals
+      tags: [savings]
+      summary: List the user's savings goals
+      responses:
+        "200":
+          description: Savings goals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SavingsGoal"
+    post:
+      operationId: createSavingsGoal
+      tags: [savings]
+      summary: Create a savings goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavingsGoalInput"
+      responses:
+        "201":
+          description: Created savings goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsGoal"
+  /savings-goals/{id}:
+    patch:
+      operationId: updateSavingsGoal
+      tags: [savings]
+      summary: Update a savings goal
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavingsGoalUpdate"
+      responses:
+        "200":
+          description: Updated savings goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsGoal"
+    delete:
+      operationId: deleteSavingsGoal
+      tags: [savings]
+      summary: Delete a savings goal
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /savings-goals/{id}/contributions:
+    post:
+      operationId: addSavingsContribution
+      tags: [savings]
+      summary: Add money to a savings goal
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavingsContributionInput"
+      responses:
+        "200":
+          description: Updated savings goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsGoal"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int32
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +312,154 @@ components:
           type: string
       required:
         - status
+    Profile:
+      type: object
+      required: [monthlyIncome]
+      properties:
+        monthlyIncome:
+          type: number
+        displayName:
+          type: ["string", "null"]
+        preferredCurrency:
+          type: string
+        language:
+          type: string
+        theme:
+          type: string
+    ProfileUpdate:
+      type: object
+      properties:
+        monthlyIncome:
+          type: number
+          minimum: 0
+        preferredCurrency:
+          type: string
+        language:
+          type: string
+        theme:
+          type: string
+    Dashboard:
+      type: object
+      required: [monthlyIncome, upcomingBills, totalRemainingDebt, currentSavings, savingsProgress, billsDueSoon]
+      properties:
+        monthlyIncome:
+          type: number
+        upcomingBills:
+          type: number
+        totalRemainingDebt:
+          type: number
+        currentSavings:
+          type: number
+        savingsProgress:
+          type: number
+        billsDueSoon:
+          type: integer
+        nextBill:
+          type: ["string", "null"]
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/Activity"
+    Activity:
+      type: object
+      required: [id, title, detail, kind, occurredAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        kind: { type: string }
+        occurredAt: { type: string }
+    Bill:
+      type: object
+      required: [id, name, amount, dueDate, frequency, paid, status]
+      properties:
+        id: { type: integer, format: int32 }
+        name: { type: string }
+        amount: { type: number }
+        dueDate: { type: string, format: date }
+        frequency: { type: string }
+        paid: { type: boolean }
+        status: { type: string }
+    BillInput:
+      type: object
+      required: [name, amount, dueDate, frequency]
+      properties:
+        name: { type: string, minLength: 1 }
+        amount: { type: number, minimum: 0 }
+        dueDate: { type: string, format: date }
+        frequency: { type: string }
+        paid: { type: boolean }
+    BillUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        amount: { type: number, minimum: 0 }
+        dueDate: { type: string, format: date }
+        frequency: { type: string }
+        paid: { type: boolean }
+    Debt:
+      type: object
+      required: [id, name, totalAmount, remainingAmount, monthlyPayment, dueDate, progress]
+      properties:
+        id: { type: integer, format: int32 }
+        name: { type: string }
+        totalAmount: { type: number }
+        remainingAmount: { type: number }
+        monthlyPayment: { type: number }
+        dueDate: { type: string, format: date }
+        progress: { type: number }
+    DebtInput:
+      type: object
+      required: [name, totalAmount, remainingAmount, monthlyPayment, dueDate]
+      properties:
+        name: { type: string, minLength: 1 }
+        totalAmount: { type: number, minimum: 0 }
+        remainingAmount: { type: number, minimum: 0 }
+        monthlyPayment: { type: number, minimum: 0 }
+        dueDate: { type: string, format: date }
+    DebtUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        totalAmount: { type: number, minimum: 0 }
+        remainingAmount: { type: number, minimum: 0 }
+        monthlyPayment: { type: number, minimum: 0 }
+        dueDate: { type: string, format: date }
+    DebtPaymentInput:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: number, minimum: 0.01 }
+    SavingsGoal:
+      type: object
+      required: [id, name, targetAmount, currentAmount, targetDate, remainingAmount, monthlyTarget, progress]
+      properties:
+        id: { type: integer, format: int32 }
+        name: { type: string }
+        targetAmount: { type: number }
+        currentAmount: { type: number }
+        targetDate: { type: string, format: date }
+        remainingAmount: { type: number }
+        monthlyTarget: { type: number }
+        progress: { type: number }
+    SavingsGoalInput:
+      type: object
+      required: [name, targetAmount, currentAmount, targetDate]
+      properties:
+        name: { type: string, minLength: 1 }
+        targetAmount: { type: number, minimum: 0 }
+        currentAmount: { type: number, minimum: 0 }
+        targetDate: { type: string, format: date }
+    SavingsGoalUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        targetAmount: { type: number, minimum: 0 }
+        currentAmount: { type: number, minimum: 0 }
+        targetDate: { type: string, format: date }
+    SavingsContributionInput:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: number, minimum: 0.01 }
 
