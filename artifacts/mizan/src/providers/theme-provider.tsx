@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
 import { getGetProfileQueryKey, useGetProfile } from '@workspace/api-client-react';
-import { useAuth } from '@clerk/react';
+import { useAuth } from '@/providers/auth-provider';
 
 type Theme = "dark" | "light" | "system"
 
@@ -26,9 +26,9 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   )
-  const { isSignedIn } = useAuth();
+  const { user } = useAuth();
   const { data: profile } = useGetProfile({
-    query: { enabled: !!isSignedIn, queryKey: getGetProfileQueryKey() },
+    query: { enabled: !!user, queryKey: getGetProfileQueryKey() },
   });
 
   useEffect(() => {

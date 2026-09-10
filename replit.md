@@ -12,7 +12,7 @@ Mizan is a bilingual personal finance workspace for organizing bills, debt, and 
 - Required env: `MONGODB_URI` — the Atlas Drivers connection URI
 - Required secrets: `MONGODB_USERNAME` and `MONGODB_PASSWORD` — Atlas database-user credentials applied safely to the configured URI
 - Required secret: `GEMINI_API_KEY` — server-only Gemini access for the financial assistant
-- Clerk secrets are provisioned for authentication; the browser uses Clerk session cookies for API access.
+- `SESSION_SECRET` signs Mizan's server-only authentication cookie.
 
 ## Stack
 
@@ -25,14 +25,15 @@ Mizan is a bilingual personal finance workspace for organizing bills, debt, and 
 
 ## Where things live
 
-- `artifacts/mizan` — React/Vite web app with Clerk routes, dashboard, CRUD pages, and bilingual theme providers
-- `artifacts/api-server` — Express API with Clerk middleware and user-scoped finance routes
+- `artifacts/mizan` — React/Vite web app with custom auth routes, dashboard, CRUD pages, and bilingual theme providers
+- `artifacts/api-server` — Express API with signed-cookie authentication and user-scoped finance routes
 - `lib/api-spec/openapi.yaml` — source of truth for generated API hooks and Zod schemas
 - MongoDB database `mizan` — profiles, bills, debts, payments, savings goals, contributions, and counters
 
 ## Architecture decisions
 
-- Clerk owns sign-up, sign-in, and user identity; financial records store the Clerk user ID and are filtered server-side on every query.
+- Mizan owns email/password sign-up and sign-in. Passwords are hashed with scrypt, must contain at least 6 characters, and do not require an email verification code.
+- Sessions use signed, HTTP-only, same-site cookies. Financial records store the authenticated Mizan user ID and are filtered server-side on every query.
 - Mizan uses the user's MongoDB Atlas cluster for application persistence; dates are stored as calendar strings to avoid timezone drift.
 - Debt payments and savings contributions update balances and append history inside MongoDB transactions to prevent concurrent requests from creating inconsistent totals.
 - The generated OpenAPI client is the frontend contract; mutations invalidate the affected React Query caches so changes remain visible after navigation and refresh.
@@ -41,7 +42,7 @@ Mizan is a bilingual personal finance workspace for organizing bills, debt, and 
 
 ## Product
 
-Mizan includes a public landing page, branded Clerk auth screens, a dashboard summary, bill tracking with paid/overdue states, debt progress and payments, savings goals and contributions, a Gemini financial assistant, responsive navigation, Arabic RTL support, and light/dark themes.
+Mizan includes a public landing page, immediate email/password account creation, a dashboard summary, bill tracking with paid/overdue states, debt progress and payments, savings goals and contributions, a Gemini financial assistant, responsive navigation, Arabic RTL support, and light/dark themes.
 
 ## User preferences
 

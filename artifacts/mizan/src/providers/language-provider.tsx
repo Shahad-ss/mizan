@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getGetProfileQueryKey, useGetProfile } from '@workspace/api-client-react';
-import { useAuth } from '@clerk/react';
+import { useAuth } from '@/providers/auth-provider';
 
 type Language = 'en' | 'ar';
 
@@ -134,9 +134,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>(
     (localStorage.getItem('mizan-lang') as Language) || 'en'
   );
-  const { isSignedIn } = useAuth();
+  const { user } = useAuth();
   const { data: profile } = useGetProfile({
-    query: { enabled: !!isSignedIn, queryKey: getGetProfileQueryKey() },
+    query: { enabled: !!user, queryKey: getGetProfileQueryKey() },
   });
 
   useEffect(() => {

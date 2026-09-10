@@ -1,5 +1,4 @@
 import { GoogleGenAI } from "@google/genai";
-import { getAuth } from "@clerk/express";
 import {
   AddSavingsContributionBody,
   AddSavingsContributionParams,
@@ -38,6 +37,7 @@ import {
 import type { ClientSession } from "mongodb";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getMongoDb, withMongoTransaction } from "../lib/mongo";
+import { getSessionUserId } from "../lib/auth";
 
 interface ProfileRecord {
   userId: string;
@@ -91,10 +91,8 @@ interface CounterRecord {
 
 const router: IRouter = Router();
 
-function requireUserId(req: Request, res: Response): string | null {
-  const auth = getAuth(req);
-  const claimUserId = auth?.sessionClaims?.userId;
-  const userId = typeof claimUserId === "string" ? claimUserId : auth?.userId;
+async function requireUserId(req: Request, res: Response): Promise<string | null> {
+  const userId = await getSessionUserId(req);
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return null;
@@ -203,7 +201,7 @@ async function loadFinance(userId: string) {
 }
 
 router.get("/profile", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const db = await getMongoDb();
   const profile = await db.collection<ProfileRecord>("profiles").findOne({ userId });
@@ -219,7 +217,7 @@ router.get("/profile", async (req, res): Promise<void> => {
 });
 
 router.patch("/profile", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const body = UpdateProfileBody.safeParse(req.body);
   if (!body.success) {
@@ -263,7 +261,7 @@ router.patch("/profile", async (req, res): Promise<void> => {
 });
 
 router.get("/bills", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const db = await getMongoDb();
   const bills = await db
@@ -275,7 +273,7 @@ router.get("/bills", async (req, res): Promise<void> => {
 });
 
 router.post("/bills", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const body = CreateBillBody.safeParse(req.body);
   if (!body.success) {
@@ -300,7 +298,7 @@ router.post("/bills", async (req, res): Promise<void> => {
 });
 
 router.patch("/bills/:id", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = UpdateBillParams.safeParse(req.params);
   const body = UpdateBillBody.safeParse(req.body);
@@ -330,7 +328,7 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/bills/:id", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = DeleteBillParams.safeParse(req.params);
   if (!params.success) {
@@ -349,7 +347,7 @@ router.delete("/bills/:id", async (req, res): Promise<void> => {
 });
 
 router.get("/debts", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const db = await getMongoDb();
   const debts = await db
@@ -361,7 +359,7 @@ router.get("/debts", async (req, res): Promise<void> => {
 });
 
 router.post("/debts", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const body = CreateDebtBody.safeParse(req.body);
   if (!body.success || body.data.remainingAmount > body.data.totalAmount) {
@@ -386,7 +384,7 @@ router.post("/debts", async (req, res): Promise<void> => {
 });
 
 router.patch("/debts/:id", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = UpdateDebtParams.safeParse(req.params);
   const body = UpdateDebtBody.safeParse(req.body);
@@ -437,7 +435,7 @@ router.patch("/debts/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/debts/:id", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = DeleteDebtParams.safeParse(req.params);
   if (!params.success) {
@@ -456,7 +454,7 @@ router.delete("/debts/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/debts/:id/payments", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = RecordDebtPaymentParams.safeParse(req.params);
   const body = RecordDebtPaymentBody.safeParse(req.body);
@@ -502,7 +500,7 @@ router.post("/debts/:id/payments", async (req, res): Promise<void> => {
 });
 
 router.get("/savings-goals", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const db = await getMongoDb();
   const goals = await db
@@ -514,7 +512,7 @@ router.get("/savings-goals", async (req, res): Promise<void> => {
 });
 
 router.post("/savings-goals", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const body = CreateSavingsGoalBody.safeParse(req.body);
   if (!body.success || body.data.currentAmount > body.data.targetAmount) {
@@ -538,7 +536,7 @@ router.post("/savings-goals", async (req, res): Promise<void> => {
 });
 
 router.patch("/savings-goals/:id", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = UpdateSavingsGoalParams.safeParse(req.params);
   const body = UpdateSavingsGoalBody.safeParse(req.body);
@@ -589,7 +587,7 @@ router.patch("/savings-goals/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/savings-goals/:id", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = DeleteSavingsGoalParams.safeParse(req.params);
   if (!params.success) {
@@ -608,7 +606,7 @@ router.delete("/savings-goals/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/savings-goals/:id/contributions", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const params = AddSavingsContributionParams.safeParse(req.params);
   const body = AddSavingsContributionBody.safeParse(req.body);
@@ -657,7 +655,7 @@ router.post("/savings-goals/:id/contributions", async (req, res): Promise<void> 
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const { profile, bills, debts, goals } = await loadFinance(userId);
   const today = new Date();
@@ -717,7 +715,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
 });
 
 router.post("/assistant", async (req, res): Promise<void> => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
   const body = AskFinancialAssistantBody.safeParse(req.body);
   if (!body.success) {

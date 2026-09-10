@@ -1,7 +1,7 @@
 import { useLocation, Link } from 'wouter';
 import { useLanguage } from '@/providers/language-provider';
 import { LayoutDashboard, Receipt, Landmark, PiggyBank, Settings, LogOut, Menu } from 'lucide-react';
-import { useClerk } from '@clerk/react';
+import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -11,8 +11,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { t, dir } = useLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { signOut } = useClerk();
-  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const { logout } = useAuth();
+  const [, setLocation] = useLocation();
 
   const navItems = [
     { href: '/dashboard', label: t('dashboard'), icon: LayoutDashboard },
@@ -66,7 +66,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-border mt-auto">
           <button
-            onClick={() => signOut({ redirectUrl: basePath || "/" })}
+            onClick={async () => {
+              await logout();
+              setLocation("/");
+            }}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <LogOut className="h-5 w-5" />
