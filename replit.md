@@ -1,6 +1,6 @@
-# [Project name]
+# Mizan Personal Finance
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Mizan is a bilingual personal finance workspace for organizing bills, debt, and savings goals.
 
 ## Run & Operate
 
@@ -9,7 +9,8 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — the managed PostgreSQL connection string
+- Clerk secrets are provisioned for authentication; the browser uses Clerk session cookies for API access.
 
 ## Stack
 
@@ -22,23 +23,30 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mizan` — React/Vite web app with Clerk routes, dashboard, CRUD pages, and bilingual theme providers
+- `artifacts/api-server` — Express API with Clerk middleware and user-scoped finance routes
+- `lib/api-spec/openapi.yaml` — source of truth for generated API hooks and Zod schemas
+- `lib/db/src/schema/finance.ts` — Drizzle schema for profiles, bills, debts, payments, goals, and contributions
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Clerk owns sign-up, sign-in, and user identity; financial records store the Clerk user ID and are filtered server-side on every query.
+- Mizan uses the Replit-managed PostgreSQL database for application persistence because no MongoDB integration is available in the workspace; dates are stored as calendar strings to avoid timezone drift.
+- The generated OpenAPI client is the frontend contract; mutations invalidate the affected React Query caches so changes remain visible after navigation and refresh.
+- Language and theme preferences are stored locally for immediate startup behavior and synchronized to the user profile when signed in.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Mizan includes a public landing page, branded Clerk auth screens, a dashboard summary, bill tracking with paid/overdue states, debt progress and payments, savings goals and contributions, responsive navigation, Arabic RTL support, and light/dark themes.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The interface should remain clear, spacious, trustworthy, and usable in both English/LTR and Arabic/RTL.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After changing `lib/api-spec/openapi.yaml`, run `pnpm --filter @workspace/api-spec run codegen`.
+- Restart both managed services after API or frontend changes: `artifacts/api-server: API Server` and `artifacts/mizan: web`.
 
 ## Pointers
 

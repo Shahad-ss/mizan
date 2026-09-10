@@ -1,0 +1,174 @@
+import { useState } from 'react';
+import { useListDebts, useCreateDebt, useUpdateDebt, useDeleteDebt, useRecordDebtPayment, getListDebtsQueryKey, useGetProfile } from '@workspace/api-client-react';
+import { Card, CardContent, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, Progress } from '@/components/ui';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Trash2, Landmark, HandCoins } from 'lucide-react';
+import { toast } from 'sonner';
+import { useLanguage } from '@/providers/language-provider';
+
+export default function Debts() {
+  const { t, dir } = useLanguage();
+  const { data: debts, isLoading } = useListDebts();
+  const { data: profile } = useGetProfile();
+  const createDebt = useCreateDebt();
+  const deleteDebt = useDeleteDebt();
+  const recordPayment = useRecordDebtPayment();
+  const queryClient = useQueryClient();
+  
+  const [isOpen, setIsOpen] = useState(false);
+  const [paymentOpenId, setPaymentOpenId] = useState<number | null>(null);
+  
+  const currency = profile?.preferredCurrency || "USD";
+  const formatCurrency = (val: number) => 
+    new Intl.NumberFormat(dir === 'rtl' ? 'ar' : 'en-US', { style: 'currency', currency }).format(val);
+
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name') as string,
+      totalAmount: Number(formData.get('totalAmount')),
+      remainingAmount: Number(formData.get('totalAmount')), // initially same
+      monthlyPayment: Number(formData.get('monthlyPayment')),
+      dueDate: formData.get('dueDate') as string,
+    };
+
+    createDebt.mutate({ data }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListDebtsQueryKey() });
+        setIsOpen(false);
+        toast.success("Debt tracker created");
+      }
+    });
+  };
+
+  const onPayment = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!paymentOpenId) return;
+    const formData = new FormData(e.currentTarget);
+    recordPayment.mutate({ id: paymentOpenId, data: { amount: Number(formData.get('amount')) } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListDebtsQueryKey() });
+        setPaymentOpenId(null);
+        toast.success("Payment recorded");
+      }
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    if(confirm("Delete this debt record?")) {
+      deleteDebt.mutate({ id }, {
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: getListDebtsQueryKey() })
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-serif font-bold text-foreground">{t('debts')}</h1>
+          <p className="text-muted-foreground mt-1 text-lg">Focus on clearing balances intentionally.</p>
+        </div>
+        <Button onClick={() => setIsOpen(true)} className="rounded-full px-6 shadow-md" size="lg">
+          <Plus className="ms-[-0.25rem] me-2 h-5 w-5" /> {t('add_debt')}
+        </Button>
+      </header>
+
+      {/* CREATE DIALOG */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('add_debt')}</DialogTitle></DialogHeader>
+          <form onSubmit={onSubmit} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>{t('name')}</Label>
+              <Input name="name" required placeholder="e.g. Student Loan" />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('total_amount')}</Label>
+              <Input name="totalAmount" type="number" step="0.01" required />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('monthly_payment')}</Label>
+              <Input name="monthlyPayment" type="number" step="0.01" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Target Payoff Date</Label>
+              <Input name="dueDate" type="date" required />
+            </div>
+            <Button type="submit" className="w-full mt-6" disabled={createDebt.isPending}>{t('save')}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* PAYMENT DIALOG */}
+      <Dialog open={!!paymentOpenId} onOpenChange={(open) => !open && setPaymentOpenId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
+          <form onSubmit={onPayment} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>{t('amount')}</Label>
+              <Input name="amount" type="number" step="0.01" required placeholder="0.00" />
+            </div>
+            <Button type="submit" className="w-full mt-6" disabled={recordPayment.isPending}>Submit Payment</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {isLoading ? (
+        <div className="grid gap-6">
+          {[1,2].map(i => <div key={i} className="h-40 rounded-3xl bg-muted animate-pulse" />)}
+        </div>
+      ) : debts?.length === 0 ? (
+        <Card className="rounded-3xl border-dashed">
+          <CardContent className="p-16 text-center flex flex-col items-center justify-center">
+            <div className="h-16 w-16 bg-accent/10 text-accent rounded-2xl flex items-center justify-center mb-6">
+              <Landmark className="h-8 w-8" />
+            </div>
+            <h3 className="text-xl font-serif font-bold mb-2">No debts tracked</h3>
+            <p className="text-muted-foreground mb-6">You're completely debt free, or haven't tracked any yet!</p>
+            <Button onClick={() => setIsOpen(true)} variant="outline" className="rounded-full">
+              {t('add_debt')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6">
+          {debts?.map(debt => (
+            <Card key={debt.id} className="rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row gap-8 items-center">
+                <div className="flex-1 w-full space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-bold">{debt.name}</h3>
+                      <p className="text-muted-foreground text-sm mt-1">Target: {new Date(debt.dueDate).toLocaleDateString()}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-end mb-2">
+                      <span className="text-3xl font-serif text-foreground font-bold">{formatCurrency(debt.remainingAmount)} <span className="text-base font-sans text-muted-foreground font-normal">left</span></span>
+                      <span className="text-sm font-medium">{Math.round(debt.progress)}% Paid</span>
+                    </div>
+                    <Progress value={debt.progress} className="h-3" />
+                  </div>
+                </div>
+                
+                <div className="w-full sm:w-auto bg-muted/50 p-6 rounded-2xl flex flex-col items-center justify-center min-w-[200px] border border-border/50">
+                  <p className="text-sm text-muted-foreground mb-1">{t('monthly_payment')}</p>
+                  <p className="text-xl font-bold text-foreground mb-4">{formatCurrency(debt.monthlyPayment)}</p>
+                  <Button className="w-full rounded-xl" onClick={() => setPaymentOpenId(debt.id)}>
+                    <HandCoins className="h-4 w-4 me-2" /> Pay
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
