@@ -1,9 +1,14 @@
 import { createRoot } from 'react-dom/client';
+import { setBaseUrl } from '@workspace/api-client-react';
 
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
+
+// Set base URL for API calls to live Render backend
+const apiUrl = import.meta.env.VITE_API_URL || 'https://mizan-backend-dfbd.onrender.com';
+setBaseUrl(apiUrl);
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
@@ -15,3 +20,4 @@ createRoot(document.getElementById('root')!, {
     <App />
   </ErrorBoundary>,
 );
+
