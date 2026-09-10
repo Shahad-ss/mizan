@@ -1,6 +1,6 @@
 # Mizan Personal Finance
 
-Mizan is a bilingual personal finance workspace for organizing bills, debt, and savings goals.
+Mizan is an English personal finance workspace for organizing bills, debt, and savings goals.
 
 ## Run & Operate
 
@@ -25,7 +25,7 @@ Mizan is a bilingual personal finance workspace for organizing bills, debt, and 
 
 ## Where things live
 
-- `artifacts/mizan` — React/Vite web app with custom auth routes, dashboard, CRUD pages, and bilingual theme providers
+- `artifacts/mizan` — React/Vite web app with custom auth routes, dashboard, CRUD pages, and English theme providers
 - `artifacts/api-server` — Express API with signed-cookie authentication and user-scoped finance routes
 - `lib/api-spec/openapi.yaml` — source of truth for generated API hooks and Zod schemas
 - MongoDB database `mizan` — profiles, bills, debts, payments, savings goals, contributions, and counters
@@ -42,11 +42,11 @@ Mizan is a bilingual personal finance workspace for organizing bills, debt, and 
 
 ## Product
 
-Mizan includes a public landing page, immediate email/password account creation, a dashboard summary, bill tracking with paid/overdue states, debt progress and payments, savings goals and contributions, a Gemini financial assistant, responsive navigation, Arabic RTL support, and light/dark themes.
+Mizan includes a public landing page, immediate email/password account creation, a dashboard summary, bill tracking with paid/overdue states, debt progress and payments, savings goals and contributions, a Gemini financial assistant, responsive navigation, KWD and other currency formatting, and light/dark themes.
 
 ## User preferences
 
-The interface should remain clear, spacious, trustworthy, and usable in both English/LTR and Arabic/RTL.
+The interface should remain clear, spacious, trustworthy, and English-only with LTR layout.
 
 ## Gotchas
 

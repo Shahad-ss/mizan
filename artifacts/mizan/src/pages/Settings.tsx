@@ -7,7 +7,7 @@ import { useLanguage } from '@/providers/language-provider';
 import { useTheme } from '@/providers/theme-provider';
 
 export default function Settings() {
-  const { t, setLanguage: setContextLang } = useLanguage();
+  const { t } = useLanguage();
   const { setTheme: setContextTheme } = useTheme();
   const { data: profile, isLoading } = useGetProfile();
   const updateProfile = useUpdateProfile();
@@ -25,7 +25,7 @@ export default function Settings() {
       setFormData({
         monthlyIncome: profile.monthlyIncome,
         preferredCurrency: profile.preferredCurrency || "USD",
-        language: profile.language || "en",
+        language: "en",
         theme: profile.theme || "system"
       });
     }
@@ -37,9 +37,6 @@ export default function Settings() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
         toast.success("Preferences updated successfully");
-        if (formData.language === 'en' || formData.language === 'ar') {
-          setContextLang(formData.language as 'en' | 'ar');
-        }
         if (formData.theme) {
           setContextTheme(formData.theme as any);
         }
@@ -81,20 +78,10 @@ export default function Settings() {
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
                   <SelectItem value="GBP">GBP (£)</SelectItem>
-                  <SelectItem value="AED">AED (د.إ)</SelectItem>
-                  <SelectItem value="SAR">SAR (د.إ)</SelectItem>
-                  <SelectItem value="EGP">EGP (ج.م)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-base">{t('language')}</Label>
-              <Select value={formData.language} onValueChange={v => setFormData({ ...formData, language: v })}>
-                <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="ar">العربية</SelectItem>
+                  <SelectItem value="AED">AED</SelectItem>
+                  <SelectItem value="SAR">SAR</SelectItem>
+                  <SelectItem value="KWD">KWD (KD)</SelectItem>
+                  <SelectItem value="EGP">EGP</SelectItem>
                 </SelectContent>
               </Select>
             </div>

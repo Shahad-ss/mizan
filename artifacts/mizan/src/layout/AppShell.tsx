@@ -9,7 +9,7 @@ import { FloatingFinancialAssistant } from '@/components/FinancialAssistant';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { t, dir } = useLanguage();
+  const { t } = useLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -38,8 +38,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-0 z-50 flex flex-col w-64 bg-card border-e border-border transition-transform duration-300 ease-in-out md:static md:translate-x-0 shadow-lg md:shadow-none",
-        mobileOpen ? (dir === 'rtl' ? "translate-x-0" : "translate-x-0") : (dir === 'rtl' ? "translate-x-full" : "-translate-x-full"),
-        dir === 'rtl' ? "end-0" : "start-0"
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+        "start-0"
       )}>
         <div className="p-6 hidden md:flex items-center gap-3 text-primary">
           <Landmark className="h-8 w-8" />

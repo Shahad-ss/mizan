@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/providers/language-provider';
 
 export default function Bills() {
-  const { t, dir } = useLanguage();
+  const { t } = useLanguage();
   const { data: bills, isLoading } = useListBills();
   const { data: profile } = useGetProfile();
   const createBill = useCreateBill();
@@ -19,7 +19,7 @@ export default function Bills() {
   
   const currency = profile?.preferredCurrency || "USD";
   const formatCurrency = (val: number) => 
-    new Intl.NumberFormat(dir === 'rtl' ? 'ar' : 'en-US', { style: 'currency', currency }).format(val);
+    new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

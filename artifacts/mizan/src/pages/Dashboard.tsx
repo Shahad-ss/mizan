@@ -5,7 +5,7 @@ import { useLanguage } from '@/providers/language-provider';
 import { DashboardFinancialAssistant } from '@/components/FinancialAssistant';
 
 export default function Dashboard() {
-  const { t, dir } = useLanguage();
+  const { t } = useLanguage();
   const { data: dashboard, isLoading: dashLoading } = useGetDashboard();
   const { data: profile } = useGetProfile();
 
@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   const currency = profile?.preferredCurrency || "USD";
   const formatCurrency = (val: number) => 
-    new Intl.NumberFormat(dir === 'rtl' ? 'ar' : 'en-US', { style: 'currency', currency }).format(val);
+    new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(val);
 
   return (
     <div className="space-y-8">
@@ -103,7 +103,7 @@ export default function Dashboard() {
                     <p className="text-sm text-muted-foreground truncate">{activity.detail}</p>
                   </div>
                   <div className="text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(activity.occurredAt).toLocaleDateString(dir === 'rtl' ? 'ar' : 'en-US', { month: 'short', day: 'numeric' })}
+                    {new Date(activity.occurredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 </div>
               ))}
