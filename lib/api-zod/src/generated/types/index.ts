@@ -8,8 +8,11 @@
 
 export * from './activity';
 export * from './bill';
+export * from './billFrequency';
 export * from './billInput';
+export * from './billInputFrequency';
 export * from './billUpdate';
+export * from './billUpdateFrequency';
 export * from './dashboard';
 export * from './debt';
 export * from './debtInput';

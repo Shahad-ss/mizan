@@ -14,5 +14,10 @@ export interface SavingsGoal {
   targetDate: Date;
   remainingAmount: number;
   monthlyTarget: number;
+  monthlyContribution: number;
   progress: number;
+  /** @nullable */
+  estimatedMonthsRemaining: number | null;
+  /** @nullable */
+  estimatedCompletionDate: Date | null;
 }

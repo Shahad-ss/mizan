@@ -46,15 +46,41 @@ export interface Dashboard {
   recentActivity?: Activity[];
 }
 
+export type BillFrequency = typeof BillFrequency[keyof typeof BillFrequency];
+
+
+export const BillFrequency = {
+  weekly: 'weekly',
+  monthly: 'monthly',
+  yearly: 'yearly',
+  one_time: 'one_time',
+} as const;
+
 export interface Bill {
   id: number;
   name: string;
   amount: number;
   dueDate: string;
-  frequency: string;
+  /** @nullable */
+  endDate?: string | null;
+  frequency: BillFrequency;
   paid: boolean;
   status: string;
+  /** @nullable */
+  nextPaymentDate: string | null;
+  /** @nullable */
+  daysRemaining: number | null;
 }
+
+export type BillInputFrequency = typeof BillInputFrequency[keyof typeof BillInputFrequency];
+
+
+export const BillInputFrequency = {
+  weekly: 'weekly',
+  monthly: 'monthly',
+  yearly: 'yearly',
+  one_time: 'one_time',
+} as const;
 
 export interface BillInput {
   /** @minLength 1 */
@@ -62,9 +88,21 @@ export interface BillInput {
   /** @minimum 0 */
   amount: number;
   dueDate: string;
-  frequency: string;
+  /** @nullable */
+  endDate?: string | null;
+  frequency: BillInputFrequency;
   paid?: boolean;
 }
+
+export type BillUpdateFrequency = typeof BillUpdateFrequency[keyof typeof BillUpdateFrequency];
+
+
+export const BillUpdateFrequency = {
+  weekly: 'weekly',
+  monthly: 'monthly',
+  yearly: 'yearly',
+  one_time: 'one_time',
+} as const;
 
 export interface BillUpdate {
   /** @minLength 1 */
@@ -72,7 +110,9 @@ export interface BillUpdate {
   /** @minimum 0 */
   amount?: number;
   dueDate?: string;
-  frequency?: string;
+  /** @nullable */
+  endDate?: string | null;
+  frequency?: BillUpdateFrequency;
   paid?: boolean;
 }
 
@@ -84,6 +124,10 @@ export interface Debt {
   monthlyPayment: number;
   dueDate: string;
   progress: number;
+  /** @nullable */
+  estimatedMonthsRemaining: number | null;
+  /** @nullable */
+  estimatedPayoffDate: string | null;
 }
 
 export interface DebtInput {
@@ -93,7 +137,7 @@ export interface DebtInput {
   totalAmount: number;
   /** @minimum 0 */
   remainingAmount: number;
-  /** @minimum 0 */
+  /** @exclusiveMinimum 0 */
   monthlyPayment: number;
   dueDate: string;
 }
@@ -105,7 +149,7 @@ export interface DebtUpdate {
   totalAmount?: number;
   /** @minimum 0 */
   remainingAmount?: number;
-  /** @minimum 0 */
+  /** @exclusiveMinimum 0 */
   monthlyPayment?: number;
   dueDate?: string;
 }
@@ -123,7 +167,12 @@ export interface SavingsGoal {
   targetDate: string;
   remainingAmount: number;
   monthlyTarget: number;
+  monthlyContribution: number;
   progress: number;
+  /** @nullable */
+  estimatedMonthsRemaining: number | null;
+  /** @nullable */
+  estimatedCompletionDate: string | null;
 }
 
 export interface SavingsGoalInput {
@@ -133,7 +182,9 @@ export interface SavingsGoalInput {
   targetAmount: number;
   /** @minimum 0 */
   currentAmount: number;
-  targetDate: string;
+  targetDate?: string;
+  /** @exclusiveMinimum 0 */
+  monthlyContribution: number;
 }
 
 export interface SavingsGoalUpdate {
@@ -144,6 +195,8 @@ export interface SavingsGoalUpdate {
   /** @minimum 0 */
   currentAmount?: number;
   targetDate?: string;
+  /** @exclusiveMinimum 0 */
+  monthlyContribution?: number;
 }
 
 export interface SavingsContributionInput {

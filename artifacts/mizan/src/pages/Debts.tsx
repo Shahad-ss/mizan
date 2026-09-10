@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Landmark, HandCoins } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/providers/language-provider';
+import { formatDateOnly } from '@/lib/date';
 
 export default function Debts() {
   const { t } = useLanguage();
@@ -38,7 +39,8 @@ export default function Debts() {
         queryClient.invalidateQueries({ queryKey: getListDebtsQueryKey() });
         setIsOpen(false);
         toast.success("Debt tracker created");
-      }
+      },
+      onError: () => toast.error("Enter valid debt amounts and a monthly payment greater than zero")
     });
   };
 
@@ -90,10 +92,10 @@ export default function Debts() {
             </div>
             <div className="space-y-2">
               <Label>{t('monthly_payment')}</Label>
-              <Input name="monthlyPayment" type="number" inputMode="decimal" step="0.01" required className="h-11 w-full min-w-0 text-base tabular-nums" />
+              <Input name="monthlyPayment" type="number" inputMode="decimal" min="0.01" step="0.01" required className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
-              <Label>Target Payoff Date</Label>
+              <Label>Start Date</Label>
               <Input name="dueDate" type="date" required className="h-11 w-full min-w-0" />
             </div>
             <Button type="submit" className="w-full mt-6" disabled={createDebt.isPending}>{t('save')}</Button>
@@ -141,7 +143,7 @@ export default function Debts() {
                   <div className="flex justify-between items-start gap-3 min-w-0">
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xl font-bold break-words [overflow-wrap:anywhere]">{debt.name}</h3>
-                      <p className="text-muted-foreground text-sm mt-1">Target: {new Date(debt.dueDate).toLocaleDateString()}</p>
+                      <p className="text-muted-foreground text-sm mt-1">Started: {formatDateOnly(debt.dueDate)}</p>
                     </div>
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(debt.id)}>
                       <Trash2 className="h-4 w-4" />
@@ -154,6 +156,20 @@ export default function Debts() {
                       <span className="text-sm font-medium shrink-0">{Math.round(debt.progress)}% Paid</span>
                     </div>
                     <Progress value={debt.progress} className="h-3" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 text-sm text-muted-foreground">
+                      <p>
+                        {debt.estimatedMonthsRemaining === null
+                          ? "Add a monthly payment to estimate payoff"
+                          : debt.estimatedMonthsRemaining === 0
+                            ? "Paid in full"
+                            : `Estimated payoff: ${debt.estimatedMonthsRemaining} month${debt.estimatedMonthsRemaining === 1 ? "" : "s"}`}
+                      </p>
+                      {debt.estimatedPayoffDate && (
+                        <p className="sm:text-end">
+                          Payoff date: {formatDateOnly(debt.estimatedPayoffDate, { month: "long", year: "numeric" })}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 

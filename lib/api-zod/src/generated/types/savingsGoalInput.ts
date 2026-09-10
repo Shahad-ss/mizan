@@ -13,5 +13,7 @@ export interface SavingsGoalInput {
   targetAmount: number;
   /** @minimum 0 */
   currentAmount: number;
-  targetDate: Date;
+  targetDate?: Date;
+  /** @exclusiveMinimum 0 */
+  monthlyContribution: number;
 }

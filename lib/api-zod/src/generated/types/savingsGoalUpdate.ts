@@ -14,4 +14,6 @@ export interface SavingsGoalUpdate {
   /** @minimum 0 */
   currentAmount?: number;
   targetDate?: Date;
+  /** @exclusiveMinimum 0 */
+  monthlyContribution?: number;
 }

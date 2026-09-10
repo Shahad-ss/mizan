@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, CheckCircle2, Circle, Trash2, Calendar, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/providers/language-provider';
+import { formatDateOnly } from '@/lib/date';
 
 export default function Bills() {
   const { t } = useLanguage();
@@ -16,6 +17,7 @@ export default function Bills() {
   const queryClient = useQueryClient();
   
   const [isOpen, setIsOpen] = useState(false);
+  const [frequency, setFrequency] = useState<"weekly" | "monthly" | "yearly" | "one_time">("monthly");
   
   const currency = profile?.preferredCurrency || "USD";
   const formatCurrency = (val: number) => 
@@ -28,7 +30,8 @@ export default function Bills() {
       name: formData.get('name') as string,
       amount: Number(formData.get('amount')),
       dueDate: formData.get('dueDate') as string,
-      frequency: formData.get('frequency') as string,
+      frequency,
+      endDate: frequency === "one_time" ? null : (formData.get('endDate') as string) || null,
     };
 
     createBill.mutate({ data }, {
@@ -41,11 +44,15 @@ export default function Bills() {
     });
   };
 
-  const togglePaid = (id: number, currentPaid: boolean) => {
+  const togglePaid = (id: number, currentPaid: boolean, frequency: string) => {
     updateBill.mutate({ id, data: { paid: !currentPaid } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
-        toast.success(`Bill marked as ${!currentPaid ? 'paid' : 'unpaid'}`);
+        toast.success(
+          frequency !== "one_time" && !currentPaid
+            ? "Payment recorded and next bill scheduled"
+            : `Bill marked as ${!currentPaid ? 'paid' : 'unpaid'}`,
+        );
       }
     });
   };
@@ -93,7 +100,7 @@ export default function Bills() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="frequency">{t('frequency')}</Label>
-              <Select name="frequency" defaultValue="monthly">
+              <Select name="frequency" value={frequency} onValueChange={(value) => setFrequency(value as typeof frequency)}>
                 <SelectTrigger className="h-11 w-full min-w-0"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="monthly">{t('monthly')}</SelectItem>
@@ -103,6 +110,12 @@ export default function Bills() {
                 </SelectContent>
               </Select>
             </div>
+            {frequency !== "one_time" && (
+              <div className="space-y-2">
+                <Label htmlFor="endDate">End Date (Optional)</Label>
+                <Input id="endDate" name="endDate" type="date" className="h-11 w-full min-w-0" />
+              </div>
+            )}
             <Button type="submit" className="w-full mt-6" disabled={createBill.isPending}>
               {createBill.isPending ? 'Saving...' : t('save')}
             </Button>
@@ -143,18 +156,30 @@ export default function Bills() {
                   </Badge>
                 </div>
                 
-                <div className="flex flex-wrap items-center text-sm text-muted-foreground mb-6 gap-2 min-w-0">
+                <div className="flex flex-wrap items-center text-sm text-muted-foreground mb-2 gap-2 min-w-0">
                   <Calendar className="h-4 w-4 shrink-0" />
-                  <span>Due: {new Date(bill.dueDate).toLocaleDateString()}</span>
+                  <span>
+                    {bill.frequency === "one_time" ? "Due" : "Next payment"}:{" "}
+                    {bill.nextPaymentDate ? formatDateOnly(bill.nextPaymentDate) : "No upcoming payment"}
+                  </span>
                   <span className="px-2">&bull;</span>
-                  <span className="capitalize">{t(bill.frequency)}</span>
+                  <span className="capitalize">{bill.frequency === "one_time" ? t(bill.frequency) : `${t(bill.frequency)} recurring`}</span>
                 </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {bill.frequency === "one_time"
+                    ? bill.daysRemaining !== null && bill.daysRemaining >= 0
+                      ? `${bill.daysRemaining} day${bill.daysRemaining === 1 ? "" : "s"} remaining`
+                      : "Past due"
+                    : bill.endDate
+                      ? `Ends on ${formatDateOnly(bill.endDate, { month: "long", day: "numeric", year: "numeric" })}`
+                      : "Continues until you stop it"}
+                </p>
 
                 <div className="flex items-center gap-2 mt-auto pt-4 border-t">
                   <Button 
                     variant={bill.paid ? "outline" : "default"} 
                     className="flex-1 rounded-xl"
-                    onClick={() => togglePaid(bill.id, bill.paid)}
+                    onClick={() => togglePaid(bill.id, bill.paid, bill.frequency)}
                     disabled={updateBill.isPending}
                   >
                     {bill.paid ? <CheckCircle2 className="h-4 w-4 me-2" /> : <Circle className="h-4 w-4 me-2" />}

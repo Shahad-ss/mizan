@@ -42,7 +42,7 @@ Mizan is an English personal finance workspace for organizing bills, debt, and s
 
 ## Product
 
-Mizan includes a public landing page, immediate email/password account creation, a dashboard summary, bill tracking with paid/overdue states, debt progress and payments, savings goals and contributions, a Gemini financial assistant, responsive navigation, KWD and other currency formatting, and light/dark themes.
+Mizan includes a public landing page, immediate email/password account creation, a dashboard summary, recurring and one-time bill scheduling, debt payoff estimates and payments, savings completion estimates and contributions, a Gemini financial assistant, responsive navigation, KWD and other currency formatting, and light/dark themes.
 
 ## User preferences
 

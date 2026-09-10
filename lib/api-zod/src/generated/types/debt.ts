@@ -14,4 +14,8 @@ export interface Debt {
   monthlyPayment: number;
   dueDate: Date;
   progress: number;
+  /** @nullable */
+  estimatedMonthsRemaining: number | null;
+  /** @nullable */
+  estimatedPayoffDate: Date | null;
 }

@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, PiggyBank, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/providers/language-provider';
+import { formatDateOnly } from '@/lib/date';
 
 export default function Savings() {
   const { t } = useLanguage();
@@ -29,7 +30,7 @@ export default function Savings() {
       name: formData.get('name') as string,
       targetAmount: Number(formData.get('targetAmount')),
       currentAmount: Number(formData.get('currentAmount') || 0),
-      targetDate: formData.get('targetDate') as string,
+      monthlyContribution: Number(formData.get('monthlyContribution')),
     };
 
     createGoal.mutate({ data }, {
@@ -37,7 +38,8 @@ export default function Savings() {
         queryClient.invalidateQueries({ queryKey: getListSavingsGoalsQueryKey() });
         setIsOpen(false);
         toast.success("Savings goal created");
-      }
+      },
+      onError: () => toast.error("Enter valid savings amounts and a monthly saving greater than zero")
     });
   };
 
@@ -92,8 +94,8 @@ export default function Savings() {
               <Input name="currentAmount" type="number" inputMode="decimal" step="0.01" defaultValue="0" className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <div className="space-y-2">
-              <Label>{t('target_date')}</Label>
-              <Input name="targetDate" type="date" required className="h-11 w-full min-w-0" />
+              <Label>Planned Monthly Saving</Label>
+              <Input name="monthlyContribution" type="number" inputMode="decimal" min="0.01" step="0.01" required className="h-11 w-full min-w-0 text-base tabular-nums" />
             </div>
             <Button type="submit" className="w-full mt-6" disabled={createGoal.isPending}>{t('save')}</Button>
           </form>
@@ -152,11 +154,27 @@ export default function Savings() {
                     <span className="text-sm font-medium px-2 py-1 bg-secondary rounded-lg shrink-0">{Math.round(goal.progress)}%</span>
                   </div>
                   <Progress value={goal.progress} className="h-3 bg-secondary/50" />
+                  <div className="grid grid-cols-1 gap-1 pt-3 text-sm text-muted-foreground">
+                    <p>Remaining: {formatCurrency(goal.remainingAmount)}</p>
+                    <p>Monthly saving: {formatCurrency(goal.monthlyContribution)}</p>
+                    <p>
+                      {goal.estimatedMonthsRemaining === null
+                        ? "Add a monthly saving amount to estimate completion"
+                        : goal.estimatedMonthsRemaining === 0
+                          ? "Goal reached"
+                          : `Estimated completion: ${goal.estimatedMonthsRemaining} month${goal.estimatedMonthsRemaining === 1 ? "" : "s"}`}
+                    </p>
+                    {goal.estimatedCompletionDate && (
+                      <p>
+                        Target date: {formatDateOnly(goal.estimatedCompletionDate, { month: "long", year: "numeric" })}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 mt-auto">
                   <div className="text-sm text-muted-foreground min-w-0">
-                    Target: {new Date(goal.targetDate).toLocaleDateString()}
+                    Planned monthly: {formatCurrency(goal.monthlyContribution)}
                   </div>
                   <Button variant="outline" className="rounded-xl px-6" onClick={() => setContribOpenId(goal.id)}>
                     <Plus className="h-4 w-4 me-2" /> Add

@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BillUpdateFrequency } from './billUpdateFrequency';
 
 export interface BillUpdate {
   /** @minLength 1 */
@@ -12,6 +13,8 @@ export interface BillUpdate {
   /** @minimum 0 */
   amount?: number;
   dueDate?: Date;
-  frequency?: string;
+  /** @nullable */
+  endDate?: Date | null;
+  frequency?: BillUpdateFrequency;
   paid?: boolean;
 }

@@ -55,6 +55,8 @@ interface BillRecord {
   name: string;
   amount: number;
   dueDate: string;
+  recurrenceStartDate?: string;
+  endDate?: string | null;
   frequency: string;
   paid: boolean;
   createdAt: Date;
@@ -80,6 +82,7 @@ interface SavingsGoalRecord {
   targetAmount: number;
   currentAmount: number;
   targetDate: string;
+  monthlyContribution?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,6 +109,70 @@ function dateOnly(value: Date | string): string {
     : value.toISOString().slice(0, 10);
 }
 
+function utcDate(value: string): Date {
+  return new Date(`${value.slice(0, 10)}T00:00:00Z`);
+}
+
+function addUtcMonths(value: Date, months: number): Date {
+  const result = new Date(value);
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
+}
+
+function normalizeFrequency(value: string): "weekly" | "monthly" | "yearly" | "one_time" {
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (normalized === "weekly") return "weekly";
+  if (normalized === "monthly") return "monthly";
+  if (normalized === "yearly" || normalized === "annual") return "yearly";
+  return "one_time";
+}
+
+function monthsRequired(remaining: number, monthlyAmount: number): number | null {
+  if (remaining <= 0) return 0;
+  if (monthlyAmount <= 0) return null;
+  const ratio = remaining / monthlyAmount;
+  return Math.ceil(ratio - Number.EPSILON * Math.max(1, Math.abs(ratio)) * 4);
+}
+
+function nextBillDate(bill: BillRecord): string | null {
+  const today = utcDate(new Date().toISOString().slice(0, 10));
+  const first = utcDate(bill.recurrenceStartDate ?? bill.dueDate);
+  const storedDueDate = utcDate(bill.dueDate);
+  const threshold = storedDueDate > today ? storedDueDate : today;
+  let next = first;
+  const frequency = normalizeFrequency(bill.frequency);
+  if (frequency === "one_time") {
+    return bill.dueDate;
+  }
+  if (frequency === "weekly" && next < threshold) {
+    const weeks = Math.ceil(
+      (threshold.getTime() - next.getTime()) / 604_800_000,
+    );
+    next = new Date(next.getTime() + weeks * 604_800_000);
+  } else {
+    const increment = frequency === "yearly" ? 12 : 1;
+    let periods = 1;
+    while (next < threshold) {
+      next = addUtcMonths(first, periods * increment);
+      periods += 1;
+    }
+  }
+  const nextDate = dateOnly(next);
+  return bill.endDate && nextDate > bill.endDate ? null : nextDate;
+}
+
+function estimatedDate(months: number, from?: string): string {
+  const today = utcDate(new Date().toISOString().slice(0, 10));
+  const start = from ? utcDate(from) : today;
+  return dateOnly(addUtcMonths(start > today ? start : today, months));
+}
+
 function defined<T extends object>(value: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
@@ -125,19 +192,41 @@ async function nextId(name: string, session?: ClientSession): Promise<number> {
 
 function billView(bill: BillRecord) {
   const today = new Date().toISOString().slice(0, 10);
+  const frequency = normalizeFrequency(bill.frequency);
+  const nextPaymentDate =
+    bill.paid && frequency !== "one_time" ? null : nextBillDate(bill);
+  const daysRemaining = nextPaymentDate
+    ? Math.ceil(
+        (utcDate(nextPaymentDate).getTime() - utcDate(today).getTime()) /
+          86_400_000,
+      )
+    : null;
   return {
     id: bill.id,
     name: bill.name,
     amount: bill.amount,
     dueDate: bill.dueDate,
-    frequency: bill.frequency,
+    endDate: bill.endDate ?? null,
+    frequency,
     paid: bill.paid,
-    status: bill.paid ? "paid" : bill.dueDate < today ? "overdue" : "upcoming",
+    status: bill.paid
+      ? "paid"
+      : frequency === "one_time" && bill.dueDate < today
+        ? "overdue"
+        : nextPaymentDate
+          ? "upcoming"
+          : "ended",
+    nextPaymentDate,
+    daysRemaining,
   };
 }
 
 function debtView(debt: DebtRecord) {
   const paid = Math.max(0, debt.totalAmount - debt.remainingAmount);
+  const estimatedMonthsRemaining = monthsRequired(
+    debt.remainingAmount,
+    debt.monthlyPayment,
+  );
   return {
     id: debt.id,
     name: debt.name,
@@ -149,31 +238,40 @@ function debtView(debt: DebtRecord) {
       debt.totalAmount > 0
         ? Math.min(100, (paid / debt.totalAmount) * 100)
         : 0,
+    estimatedMonthsRemaining,
+    estimatedPayoffDate:
+      estimatedMonthsRemaining === null
+        ? null
+        : estimatedDate(estimatedMonthsRemaining, debt.dueDate),
   };
 }
 
 function savingsView(goal: SavingsGoalRecord) {
   const remainingAmount = Math.max(0, goal.targetAmount - goal.currentAmount);
-  const now = new Date();
-  const target = new Date(`${goal.targetDate}T12:00:00Z`);
-  const months = Math.max(
-    1,
-    (target.getUTCFullYear() - now.getUTCFullYear()) * 12 +
-      target.getUTCMonth() -
-      now.getUTCMonth(),
+  const monthlyContribution = goal.monthlyContribution ?? 0;
+  const estimatedMonthsRemaining = monthsRequired(
+    remainingAmount,
+    monthlyContribution,
   );
+  const estimatedCompletionDate =
+    estimatedMonthsRemaining === null
+      ? null
+      : estimatedDate(estimatedMonthsRemaining);
   return {
     id: goal.id,
     name: goal.name,
     targetAmount: goal.targetAmount,
     currentAmount: goal.currentAmount,
-    targetDate: goal.targetDate,
+    targetDate: estimatedCompletionDate ?? goal.targetDate,
     remainingAmount,
-    monthlyTarget: remainingAmount / months,
+    monthlyTarget: monthlyContribution,
+    monthlyContribution,
     progress:
       goal.targetAmount > 0
         ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)
         : 0,
+    estimatedMonthsRemaining,
+    estimatedCompletionDate,
   };
 }
 
@@ -276,8 +374,11 @@ router.post("/bills", async (req, res): Promise<void> => {
   const userId = await requireUserId(req, res);
   if (!userId) return;
   const body = CreateBillBody.safeParse(req.body);
-  if (!body.success) {
-    res.status(400).json({ error: body.error.message });
+  if (
+    !body.success ||
+    (body.data.endDate && dateOnly(body.data.endDate) < dateOnly(body.data.dueDate))
+  ) {
+    res.status(400).json({ error: "Invalid bill details" });
     return;
   }
   const db = await getMongoDb();
@@ -288,6 +389,8 @@ router.post("/bills", async (req, res): Promise<void> => {
     name: body.data.name,
     amount: body.data.amount,
     dueDate: dateOnly(body.data.dueDate),
+    recurrenceStartDate: dateOnly(body.data.dueDate),
+    endDate: body.data.endDate ? dateOnly(body.data.endDate) : null,
     frequency: body.data.frequency,
     paid: body.data.paid ?? false,
     createdAt: now,
@@ -306,24 +409,80 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid bill update" });
     return;
   }
-  const { dueDate, ...rest } = body.data;
+  const { dueDate, endDate, ...rest } = body.data;
   const db = await getMongoDb();
   const bills = db.collection<BillRecord>("bills");
+  const existing = await bills.findOne({ id: params.data.id, userId });
+  if (!existing) {
+    res.status(404).json({ error: "Bill not found" });
+    return;
+  }
+  const frequency = normalizeFrequency(rest.frequency ?? existing.frequency);
+  const baseDueDate = dueDate ? dateOnly(dueDate) : existing.dueDate;
+  const effectiveEndDate =
+    endDate === undefined
+      ? existing.endDate
+      : endDate
+        ? dateOnly(endDate)
+        : null;
+  if (effectiveEndDate && effectiveEndDate < baseDueDate) {
+    res.status(400).json({ error: "End date cannot be before the due date" });
+    return;
+  }
+  const recurringPayment =
+    rest.paid === true && frequency !== "one_time";
+  const recurrenceStartDate =
+    dueDate !== undefined || rest.frequency !== undefined
+      ? baseDueDate
+      : existing.recurrenceStartDate ?? existing.dueDate;
+  const currentOccurrence = nextBillDate({
+    ...existing,
+    ...defined(rest),
+    dueDate: baseDueDate,
+    recurrenceStartDate,
+    endDate: effectiveEndDate,
+    frequency,
+    paid: false,
+  });
+  const followingOccurrence = currentOccurrence
+    ? nextBillDate({
+        ...existing,
+        dueDate: dateOnly(
+          new Date(utcDate(currentOccurrence).getTime() + 86_400_000),
+        ),
+        recurrenceStartDate,
+        endDate: effectiveEndDate,
+        frequency,
+        paid: false,
+      })
+    : null;
+  const hasFollowingOccurrence =
+    recurringPayment &&
+    followingOccurrence !== null &&
+    (!effectiveEndDate || followingOccurrence <= effectiveEndDate);
   await bills.updateOne(
     { id: params.data.id, userId },
     {
       $set: {
         ...defined(rest),
-        ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
+        dueDate:
+          recurringPayment && hasFollowingOccurrence
+            ? followingOccurrence
+            : baseDueDate,
+        frequency,
+        recurrenceStartDate,
+        ...(recurringPayment
+          ? { paid: !hasFollowingOccurrence }
+          : {}),
+        ...(endDate !== undefined
+          ? { endDate: endDate ? dateOnly(endDate) : null }
+          : {}),
         updatedAt: new Date(),
       },
     },
   );
   const bill = await bills.findOne({ id: params.data.id, userId });
-  if (!bill) {
-    res.status(404).json({ error: "Bill not found" });
-    return;
-  }
+  if (!bill) throw new Error("Bill disappeared after update");
   res.json(UpdateBillResponse.parse(billView(bill)));
 });
 
@@ -521,13 +680,18 @@ router.post("/savings-goals", async (req, res): Promise<void> => {
   }
   const db = await getMongoDb();
   const now = new Date();
+  const initialMonths = monthsRequired(
+    Math.max(0, body.data.targetAmount - body.data.currentAmount),
+    body.data.monthlyContribution,
+  );
   const goal: SavingsGoalRecord = {
     id: await nextId("savings_goals"),
     userId,
     name: body.data.name,
     targetAmount: body.data.targetAmount,
     currentAmount: body.data.currentAmount,
-    targetDate: dateOnly(body.data.targetDate),
+    targetDate: estimatedDate(initialMonths ?? 0),
+    monthlyContribution: body.data.monthlyContribution,
     createdAt: now,
     updatedAt: now,
   };
@@ -562,12 +726,20 @@ router.patch("/savings-goals/:id", async (req, res): Promise<void> => {
       invalidState = true;
       return null;
     }
+    const recalculatedMonths = monthsRequired(
+      Math.max(0, merged.targetAmount - merged.currentAmount),
+      merged.monthlyContribution ?? 0,
+    );
+    const recalculatedTargetDate =
+      recalculatedMonths === null
+        ? merged.targetDate
+        : estimatedDate(recalculatedMonths);
     await goals.updateOne(
       { id: params.data.id, userId },
       {
         $set: {
           ...defined(rest),
-          ...(targetDate ? { targetDate: dateOnly(targetDate) } : {}),
+          targetDate: recalculatedTargetDate,
           updatedAt: new Date(),
         },
       },
@@ -625,11 +797,19 @@ router.post("/savings-goals/:id/contributions", async (req, res): Promise<void> 
       body.data.amount,
       Math.max(0, existing.targetAmount - existing.currentAmount),
     );
+    const nextCurrentAmount = existing.currentAmount + amount;
+    const nextMonths = monthsRequired(
+      Math.max(0, existing.targetAmount - nextCurrentAmount),
+      existing.monthlyContribution ?? 0,
+    );
     await goals.updateOne(
       { id: existing.id, userId },
       {
         $set: {
-          currentAmount: existing.currentAmount + amount,
+          currentAmount: nextCurrentAmount,
+          ...(nextMonths === null
+            ? {}
+            : { targetDate: estimatedDate(nextMonths) }),
           updatedAt: new Date(),
         },
       },
@@ -663,7 +843,11 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   const soon = new Date(today);
   soon.setDate(soon.getDate() + 7);
   const soonKey = soon.toISOString().slice(0, 10);
-  const unpaid = bills.filter((bill) => !bill.paid);
+  const unpaid = bills.flatMap((bill) => {
+    if (bill.paid) return [];
+    const nextPaymentDate = nextBillDate(bill);
+    return nextPaymentDate ? [{ bill, nextPaymentDate }] : [];
+  });
   const currentSavings = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
   const savingsTarget = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
   const recentActivity = [
@@ -692,12 +876,12 @@ router.get("/dashboard", async (req, res): Promise<void> => {
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .slice(0, 5);
   const nextBill = [...unpaid].sort((a, b) =>
-    a.dueDate.localeCompare(b.dueDate),
+    a.nextPaymentDate.localeCompare(b.nextPaymentDate),
   )[0];
   res.json(
     GetDashboardResponse.parse({
       monthlyIncome: profile?.monthlyIncome ?? 0,
-      upcomingBills: unpaid.reduce((sum, bill) => sum + bill.amount, 0),
+      upcomingBills: unpaid.reduce((sum, item) => sum + item.bill.amount, 0),
       totalRemainingDebt: debts.reduce(
         (sum, debt) => sum + debt.remainingAmount,
         0,
@@ -706,9 +890,11 @@ router.get("/dashboard", async (req, res): Promise<void> => {
       savingsProgress:
         savingsTarget > 0 ? (currentSavings / savingsTarget) * 100 : 0,
       billsDueSoon: unpaid.filter(
-        (bill) => bill.dueDate >= todayKey && bill.dueDate <= soonKey,
+        (item) =>
+          item.nextPaymentDate >= todayKey &&
+          item.nextPaymentDate <= soonKey,
       ).length,
-      nextBill: nextBill?.name ?? null,
+      nextBill: nextBill?.bill.name ?? null,
       recentActivity,
     }),
   );

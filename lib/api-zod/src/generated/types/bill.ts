@@ -5,13 +5,20 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BillFrequency } from './billFrequency';
 
 export interface Bill {
   id: number;
   name: string;
   amount: number;
   dueDate: Date;
-  frequency: string;
+  /** @nullable */
+  endDate?: Date | null;
+  frequency: BillFrequency;
   paid: boolean;
   status: string;
+  /** @nullable */
+  nextPaymentDate: Date | null;
+  /** @nullable */
+  daysRemaining: number | null;
 }

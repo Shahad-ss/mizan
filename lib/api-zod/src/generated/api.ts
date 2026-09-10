@@ -81,9 +81,12 @@ export const ListBillsResponseItem = zod.object({
   "name": zod.string(),
   "amount": zod.number(),
   "dueDate": zod.coerce.date(),
-  "frequency": zod.string(),
+  "endDate": zod.coerce.date().nullish(),
+  "frequency": zod.enum(['weekly', 'monthly', 'yearly', 'one_time']),
   "paid": zod.boolean(),
-  "status": zod.string()
+  "status": zod.string(),
+  "nextPaymentDate": zod.coerce.date().nullable(),
+  "daysRemaining": zod.number().int().nullable()
 })
 export const ListBillsResponse = zod.array(ListBillsResponseItem)
 
@@ -100,7 +103,8 @@ export const CreateBillBody = zod.object({
   "name": zod.string().min(1),
   "amount": zod.number().min(createBillBodyAmountMin),
   "dueDate": zod.coerce.date(),
-  "frequency": zod.string(),
+  "endDate": zod.coerce.date().nullish(),
+  "frequency": zod.enum(['weekly', 'monthly', 'yearly', 'one_time']),
   "paid": zod.boolean().optional()
 })
 
@@ -109,9 +113,12 @@ export const CreateBillResponse = zod.object({
   "name": zod.string(),
   "amount": zod.number(),
   "dueDate": zod.coerce.date(),
-  "frequency": zod.string(),
+  "endDate": zod.coerce.date().nullish(),
+  "frequency": zod.enum(['weekly', 'monthly', 'yearly', 'one_time']),
   "paid": zod.boolean(),
-  "status": zod.string()
+  "status": zod.string(),
+  "nextPaymentDate": zod.coerce.date().nullable(),
+  "daysRemaining": zod.number().int().nullable()
 })
 
 
@@ -131,7 +138,8 @@ export const UpdateBillBody = zod.object({
   "name": zod.string().min(1).optional(),
   "amount": zod.number().min(updateBillBodyAmountMin).optional(),
   "dueDate": zod.coerce.date().optional(),
-  "frequency": zod.string().optional(),
+  "endDate": zod.coerce.date().nullish(),
+  "frequency": zod.enum(['weekly', 'monthly', 'yearly', 'one_time']).optional(),
   "paid": zod.boolean().optional()
 })
 
@@ -140,9 +148,12 @@ export const UpdateBillResponse = zod.object({
   "name": zod.string(),
   "amount": zod.number(),
   "dueDate": zod.coerce.date(),
-  "frequency": zod.string(),
+  "endDate": zod.coerce.date().nullish(),
+  "frequency": zod.enum(['weekly', 'monthly', 'yearly', 'one_time']),
   "paid": zod.boolean(),
-  "status": zod.string()
+  "status": zod.string(),
+  "nextPaymentDate": zod.coerce.date().nullable(),
+  "daysRemaining": zod.number().int().nullable()
 })
 
 
@@ -166,7 +177,9 @@ export const ListDebtsResponseItem = zod.object({
   "remainingAmount": zod.number(),
   "monthlyPayment": zod.number(),
   "dueDate": zod.coerce.date(),
-  "progress": zod.number()
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedPayoffDate": zod.coerce.date().nullable()
 })
 export const ListDebtsResponse = zod.array(ListDebtsResponseItem)
 
@@ -179,7 +192,7 @@ export const createDebtBodyTotalAmountMin = 0;
 
 export const createDebtBodyRemainingAmountMin = 0;
 
-export const createDebtBodyMonthlyPaymentMin = 0;
+export const createDebtBodyMonthlyPaymentExclusiveMin = 0;
 
 
 
@@ -187,7 +200,7 @@ export const CreateDebtBody = zod.object({
   "name": zod.string().min(1),
   "totalAmount": zod.number().min(createDebtBodyTotalAmountMin),
   "remainingAmount": zod.number().min(createDebtBodyRemainingAmountMin),
-  "monthlyPayment": zod.number().min(createDebtBodyMonthlyPaymentMin),
+  "monthlyPayment": zod.number().gt(createDebtBodyMonthlyPaymentExclusiveMin),
   "dueDate": zod.coerce.date()
 })
 
@@ -198,7 +211,9 @@ export const CreateDebtResponse = zod.object({
   "remainingAmount": zod.number(),
   "monthlyPayment": zod.number(),
   "dueDate": zod.coerce.date(),
-  "progress": zod.number()
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedPayoffDate": zod.coerce.date().nullable()
 })
 
 
@@ -214,7 +229,7 @@ export const updateDebtBodyTotalAmountMin = 0;
 
 export const updateDebtBodyRemainingAmountMin = 0;
 
-export const updateDebtBodyMonthlyPaymentMin = 0;
+export const updateDebtBodyMonthlyPaymentExclusiveMin = 0;
 
 
 
@@ -222,7 +237,7 @@ export const UpdateDebtBody = zod.object({
   "name": zod.string().min(1).optional(),
   "totalAmount": zod.number().min(updateDebtBodyTotalAmountMin).optional(),
   "remainingAmount": zod.number().min(updateDebtBodyRemainingAmountMin).optional(),
-  "monthlyPayment": zod.number().min(updateDebtBodyMonthlyPaymentMin).optional(),
+  "monthlyPayment": zod.number().gt(updateDebtBodyMonthlyPaymentExclusiveMin).optional(),
   "dueDate": zod.coerce.date().optional()
 })
 
@@ -233,7 +248,9 @@ export const UpdateDebtResponse = zod.object({
   "remainingAmount": zod.number(),
   "monthlyPayment": zod.number(),
   "dueDate": zod.coerce.date(),
-  "progress": zod.number()
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedPayoffDate": zod.coerce.date().nullable()
 })
 
 
@@ -269,7 +286,9 @@ export const RecordDebtPaymentResponse = zod.object({
   "remainingAmount": zod.number(),
   "monthlyPayment": zod.number(),
   "dueDate": zod.coerce.date(),
-  "progress": zod.number()
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedPayoffDate": zod.coerce.date().nullable()
 })
 
 
@@ -284,7 +303,10 @@ export const ListSavingsGoalsResponseItem = zod.object({
   "targetDate": zod.coerce.date(),
   "remainingAmount": zod.number(),
   "monthlyTarget": zod.number(),
-  "progress": zod.number()
+  "monthlyContribution": zod.number(),
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedCompletionDate": zod.coerce.date().nullable()
 })
 export const ListSavingsGoalsResponse = zod.array(ListSavingsGoalsResponseItem)
 
@@ -297,13 +319,16 @@ export const createSavingsGoalBodyTargetAmountMin = 0;
 
 export const createSavingsGoalBodyCurrentAmountMin = 0;
 
+export const createSavingsGoalBodyMonthlyContributionExclusiveMin = 0;
+
 
 
 export const CreateSavingsGoalBody = zod.object({
   "name": zod.string().min(1),
   "targetAmount": zod.number().min(createSavingsGoalBodyTargetAmountMin),
   "currentAmount": zod.number().min(createSavingsGoalBodyCurrentAmountMin),
-  "targetDate": zod.coerce.date()
+  "targetDate": zod.coerce.date().optional(),
+  "monthlyContribution": zod.number().gt(createSavingsGoalBodyMonthlyContributionExclusiveMin)
 })
 
 export const CreateSavingsGoalResponse = zod.object({
@@ -314,7 +339,10 @@ export const CreateSavingsGoalResponse = zod.object({
   "targetDate": zod.coerce.date(),
   "remainingAmount": zod.number(),
   "monthlyTarget": zod.number(),
-  "progress": zod.number()
+  "monthlyContribution": zod.number(),
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedCompletionDate": zod.coerce.date().nullable()
 })
 
 
@@ -330,13 +358,16 @@ export const updateSavingsGoalBodyTargetAmountMin = 0;
 
 export const updateSavingsGoalBodyCurrentAmountMin = 0;
 
+export const updateSavingsGoalBodyMonthlyContributionExclusiveMin = 0;
+
 
 
 export const UpdateSavingsGoalBody = zod.object({
   "name": zod.string().min(1).optional(),
   "targetAmount": zod.number().min(updateSavingsGoalBodyTargetAmountMin).optional(),
   "currentAmount": zod.number().min(updateSavingsGoalBodyCurrentAmountMin).optional(),
-  "targetDate": zod.coerce.date().optional()
+  "targetDate": zod.coerce.date().optional(),
+  "monthlyContribution": zod.number().gt(updateSavingsGoalBodyMonthlyContributionExclusiveMin).optional()
 })
 
 export const UpdateSavingsGoalResponse = zod.object({
@@ -347,7 +378,10 @@ export const UpdateSavingsGoalResponse = zod.object({
   "targetDate": zod.coerce.date(),
   "remainingAmount": zod.number(),
   "monthlyTarget": zod.number(),
-  "progress": zod.number()
+  "monthlyContribution": zod.number(),
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedCompletionDate": zod.coerce.date().nullable()
 })
 
 
@@ -384,7 +418,10 @@ export const AddSavingsContributionResponse = zod.object({
   "targetDate": zod.coerce.date(),
   "remainingAmount": zod.number(),
   "monthlyTarget": zod.number(),
-  "progress": zod.number()
+  "monthlyContribution": zod.number(),
+  "progress": zod.number(),
+  "estimatedMonthsRemaining": zod.number().int().nullable(),
+  "estimatedCompletionDate": zod.coerce.date().nullable()
 })
 
 

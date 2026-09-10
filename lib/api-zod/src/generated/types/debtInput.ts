@@ -13,7 +13,7 @@ export interface DebtInput {
   totalAmount: number;
   /** @minimum 0 */
   remainingAmount: number;
-  /** @minimum 0 */
+  /** @exclusiveMinimum 0 */
   monthlyPayment: number;
   dueDate: Date;
 }

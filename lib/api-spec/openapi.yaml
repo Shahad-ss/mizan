@@ -391,15 +391,18 @@ components:
         occurredAt: { type: string }
     Bill:
       type: object
-      required: [id, name, amount, dueDate, frequency, paid, status]
+      required: [id, name, amount, dueDate, frequency, paid, status, nextPaymentDate, daysRemaining]
       properties:
         id: { type: integer, format: int32 }
         name: { type: string }
         amount: { type: number }
         dueDate: { type: string, format: date }
-        frequency: { type: string }
+        endDate: { type: [string, "null"], format: date }
+        frequency: { type: string, enum: [weekly, monthly, yearly, one_time] }
         paid: { type: boolean }
         status: { type: string }
+        nextPaymentDate: { type: [string, "null"], format: date }
+        daysRemaining: { type: [integer, "null"] }
     BillInput:
       type: object
       required: [name, amount, dueDate, frequency]
@@ -407,7 +410,8 @@ components:
         name: { type: string, minLength: 1 }
         amount: { type: number, minimum: 0 }
         dueDate: { type: string, format: date }
-        frequency: { type: string }
+        endDate: { type: [string, "null"], format: date }
+        frequency: { type: string, enum: [weekly, monthly, yearly, one_time] }
         paid: { type: boolean }
     BillUpdate:
       type: object
@@ -415,11 +419,12 @@ components:
         name: { type: string, minLength: 1 }
         amount: { type: number, minimum: 0 }
         dueDate: { type: string, format: date }
-        frequency: { type: string }
+        endDate: { type: [string, "null"], format: date }
+        frequency: { type: string, enum: [weekly, monthly, yearly, one_time] }
         paid: { type: boolean }
     Debt:
       type: object
-      required: [id, name, totalAmount, remainingAmount, monthlyPayment, dueDate, progress]
+      required: [id, name, totalAmount, remainingAmount, monthlyPayment, dueDate, progress, estimatedMonthsRemaining, estimatedPayoffDate]
       properties:
         id: { type: integer, format: int32 }
         name: { type: string }
@@ -428,6 +433,8 @@ components:
         monthlyPayment: { type: number }
         dueDate: { type: string, format: date }
         progress: { type: number }
+        estimatedMonthsRemaining: { type: [integer, "null"] }
+        estimatedPayoffDate: { type: [string, "null"], format: date }
     DebtInput:
       type: object
       required: [name, totalAmount, remainingAmount, monthlyPayment, dueDate]
@@ -435,7 +442,7 @@ components:
         name: { type: string, minLength: 1 }
         totalAmount: { type: number, minimum: 0 }
         remainingAmount: { type: number, minimum: 0 }
-        monthlyPayment: { type: number, minimum: 0 }
+        monthlyPayment: { type: number, exclusiveMinimum: 0 }
         dueDate: { type: string, format: date }
     DebtUpdate:
       type: object
@@ -443,7 +450,7 @@ components:
         name: { type: string, minLength: 1 }
         totalAmount: { type: number, minimum: 0 }
         remainingAmount: { type: number, minimum: 0 }
-        monthlyPayment: { type: number, minimum: 0 }
+        monthlyPayment: { type: number, exclusiveMinimum: 0 }
         dueDate: { type: string, format: date }
     DebtPaymentInput:
       type: object
@@ -452,7 +459,7 @@ components:
         amount: { type: number, minimum: 0.01 }
     SavingsGoal:
       type: object
-      required: [id, name, targetAmount, currentAmount, targetDate, remainingAmount, monthlyTarget, progress]
+      required: [id, name, targetAmount, currentAmount, targetDate, remainingAmount, monthlyTarget, monthlyContribution, progress, estimatedMonthsRemaining, estimatedCompletionDate]
       properties:
         id: { type: integer, format: int32 }
         name: { type: string }
@@ -461,15 +468,19 @@ components:
         targetDate: { type: string, format: date }
         remainingAmount: { type: number }
         monthlyTarget: { type: number }
+        monthlyContribution: { type: number }
         progress: { type: number }
+        estimatedMonthsRemaining: { type: [integer, "null"] }
+        estimatedCompletionDate: { type: [string, "null"], format: date }
     SavingsGoalInput:
       type: object
-      required: [name, targetAmount, currentAmount, targetDate]
+      required: [name, targetAmount, currentAmount, monthlyContribution]
       properties:
         name: { type: string, minLength: 1 }
         targetAmount: { type: number, minimum: 0 }
         currentAmount: { type: number, minimum: 0 }
         targetDate: { type: string, format: date }
+        monthlyContribution: { type: number, exclusiveMinimum: 0 }
     SavingsGoalUpdate:
       type: object
       properties:
@@ -477,6 +488,7 @@ components:
         targetAmount: { type: number, minimum: 0 }
         currentAmount: { type: number, minimum: 0 }
         targetDate: { type: string, format: date }
+        monthlyContribution: { type: number, exclusiveMinimum: 0 }
     SavingsContributionInput:
       type: object
       required: [amount]
