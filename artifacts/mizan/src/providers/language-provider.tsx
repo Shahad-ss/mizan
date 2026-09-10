@@ -60,6 +60,14 @@ const translations: Record<Language, Record<string, string>> = {
     theme: "Theme",
     currency: "Preferred Currency",
     logout: "Log out",
+    assistant: "Financial Assistant",
+    assistant_greeting: "How can I help you manage your finances today?",
+    ask_assistant: "Ask Assistant",
+    type_question: "Type your question...",
+    starter_bills: "What are my upcoming bills?",
+    starter_debt: "How much debt do I have left?",
+    starter_savings: "What is my current savings progress?",
+    error_asking: "Sorry, I couldn't process that. Try again.",
   },
   ar: {
     dashboard: "لوحة القيادة",
@@ -109,6 +117,14 @@ const translations: Record<Language, Record<string, string>> = {
     theme: "المظهر",
     currency: "العملة المفضلة",
     logout: "تسجيل الخروج",
+    assistant: "المساعد المالي",
+    assistant_greeting: "كيف يمكنني مساعدتك في إدارة أموالك اليوم؟",
+    ask_assistant: "اسأل المساعد",
+    type_question: "اكتب سؤالك...",
+    starter_bills: "ما هي الفواتير القادمة؟",
+    starter_debt: "كم يتبقى من الديون؟",
+    starter_savings: "ما هو تقدم مدخراتي الحالي؟",
+    error_asking: "عذراً، لم أتمكن من معالجة ذلك. حاول مرة أخرى.",
   }
 };
 

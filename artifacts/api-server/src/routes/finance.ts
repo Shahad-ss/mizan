@@ -1,8 +1,11 @@
+import { GoogleGenAI } from "@google/genai";
 import { getAuth } from "@clerk/express";
 import {
   AddSavingsContributionBody,
   AddSavingsContributionParams,
   AddSavingsContributionResponse,
+  AskFinancialAssistantBody,
+  AskFinancialAssistantResponse,
   CreateBillBody,
   CreateBillResponse,
   CreateDebtBody,
@@ -32,23 +35,65 @@ import {
   UpdateSavingsGoalParams,
   UpdateSavingsGoalResponse,
 } from "@workspace/api-zod";
-import {
-  billsTable,
-  db,
-  debtPaymentsTable,
-  debtsTable,
-  savingsContributionsTable,
-  savingsGoalsTable,
-  userProfilesTable,
-} from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { getMongoDb } from "../lib/mongo";
+
+interface ProfileRecord {
+  userId: string;
+  monthlyIncome: number;
+  preferredCurrency: string;
+  language: string;
+  theme: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface BillRecord {
+  id: number;
+  userId: string;
+  name: string;
+  amount: number;
+  dueDate: string;
+  frequency: string;
+  paid: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface DebtRecord {
+  id: number;
+  userId: string;
+  name: string;
+  totalAmount: number;
+  remainingAmount: number;
+  monthlyPayment: number;
+  dueDate: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SavingsGoalRecord {
+  id: number;
+  userId: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface CounterRecord {
+  _id: string;
+  seq: number;
+}
 
 const router: IRouter = Router();
 
 function requireUserId(req: Request, res: Response): string | null {
   const auth = getAuth(req);
-  const userId = auth?.sessionClaims?.userId as string | undefined ?? auth?.userId;
+  const claimUserId = auth?.sessionClaims?.userId;
+  const userId = typeof claimUserId === "string" ? claimUserId : auth?.userId;
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return null;
@@ -57,10 +102,29 @@ function requireUserId(req: Request, res: Response): string | null {
 }
 
 function dateOnly(value: Date | string): string {
-  return typeof value === "string" ? value.slice(0, 10) : value.toISOString().slice(0, 10);
+  return typeof value === "string"
+    ? value.slice(0, 10)
+    : value.toISOString().slice(0, 10);
 }
 
-function billView(bill: typeof billsTable.$inferSelect) {
+function defined<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as Partial<T>;
+}
+
+async function nextId(name: string): Promise<number> {
+  const db = await getMongoDb();
+  const counter = await db.collection<CounterRecord>("counters").findOneAndUpdate(
+    { _id: name },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: "after" },
+  );
+  if (!counter) throw new Error(`Unable to allocate ${name} id`);
+  return counter.seq;
+}
+
+function billView(bill: BillRecord) {
   const today = new Date().toISOString().slice(0, 10);
   return {
     id: bill.id,
@@ -73,7 +137,7 @@ function billView(bill: typeof billsTable.$inferSelect) {
   };
 }
 
-function debtView(debt: typeof debtsTable.$inferSelect) {
+function debtView(debt: DebtRecord) {
   const paid = Math.max(0, debt.totalAmount - debt.remainingAmount);
   return {
     id: debt.id,
@@ -82,11 +146,14 @@ function debtView(debt: typeof debtsTable.$inferSelect) {
     remainingAmount: debt.remainingAmount,
     monthlyPayment: debt.monthlyPayment,
     dueDate: debt.dueDate,
-    progress: debt.totalAmount > 0 ? Math.min(100, (paid / debt.totalAmount) * 100) : 0,
+    progress:
+      debt.totalAmount > 0
+        ? Math.min(100, (paid / debt.totalAmount) * 100)
+        : 0,
   };
 }
 
-function savingsView(goal: typeof savingsGoalsTable.$inferSelect) {
+function savingsView(goal: SavingsGoalRecord) {
   const remainingAmount = Math.max(0, goal.targetAmount - goal.currentAmount);
   const now = new Date();
   const target = new Date(`${goal.targetDate}T12:00:00Z`);
@@ -111,13 +178,34 @@ function savingsView(goal: typeof savingsGoalsTable.$inferSelect) {
   };
 }
 
+async function loadFinance(userId: string) {
+  const db = await getMongoDb();
+  const [profile, bills, debts, goals] = await Promise.all([
+    db.collection<ProfileRecord>("profiles").findOne({ userId }),
+    db
+      .collection<BillRecord>("bills")
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .toArray(),
+    db
+      .collection<DebtRecord>("debts")
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .toArray(),
+    db
+      .collection<SavingsGoalRecord>("savings_goals")
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .toArray(),
+  ]);
+  return { profile, bills, debts, goals };
+}
+
 router.get("/profile", async (req, res): Promise<void> => {
   const userId = requireUserId(req, res);
   if (!userId) return;
-  const [profile] = await db
-    .select()
-    .from(userProfilesTable)
-    .where(eq(userProfilesTable.userId, userId));
+  const db = await getMongoDb();
+  const profile = await db.collection<ProfileRecord>("profiles").findOne({ userId });
   res.json(
     GetProfileResponse.parse({
       displayName: null,
@@ -137,21 +225,34 @@ router.patch("/profile", async (req, res): Promise<void> => {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const [profile] = await db
-    .insert(userProfilesTable)
-    .values({ userId, ...body.data })
-    .onConflictDoUpdate({
-      target: userProfilesTable.userId,
-      set: body.data,
-    })
-    .returning();
+  const db = await getMongoDb();
+  const profiles = db.collection<ProfileRecord>("profiles");
+  const existing = await profiles.findOne({ userId });
+  const now = new Date();
+  if (existing) {
+    await profiles.updateOne(
+      { userId },
+      { $set: { ...defined(body.data), updatedAt: now } },
+    );
+  } else {
+    await profiles.insertOne({
+      userId,
+      monthlyIncome: body.data.monthlyIncome ?? 0,
+      preferredCurrency: body.data.preferredCurrency ?? "SAR",
+      language: body.data.language ?? "en",
+      theme: body.data.theme ?? "light",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  const profile = await profiles.findOne({ userId });
   res.json(
     UpdateProfileResponse.parse({
       displayName: null,
-      monthlyIncome: profile.monthlyIncome,
-      preferredCurrency: profile.preferredCurrency,
-      language: profile.language,
-      theme: profile.theme,
+      monthlyIncome: profile?.monthlyIncome ?? 0,
+      preferredCurrency: profile?.preferredCurrency ?? "SAR",
+      language: profile?.language ?? "en",
+      theme: profile?.theme ?? "light",
     }),
   );
 });
@@ -159,11 +260,12 @@ router.patch("/profile", async (req, res): Promise<void> => {
 router.get("/bills", async (req, res): Promise<void> => {
   const userId = requireUserId(req, res);
   if (!userId) return;
+  const db = await getMongoDb();
   const bills = await db
-    .select()
-    .from(billsTable)
-    .where(eq(billsTable.userId, userId))
-    .orderBy(billsTable.dueDate);
+    .collection<BillRecord>("bills")
+    .find({ userId })
+    .sort({ dueDate: 1 })
+    .toArray();
   res.json(ListBillsResponse.parse(bills.map(billView)));
 });
 
@@ -175,15 +277,20 @@ router.post("/bills", async (req, res): Promise<void> => {
     res.status(400).json({ error: body.error.message });
     return;
   }
-  const [bill] = await db
-    .insert(billsTable)
-    .values({
-      ...body.data,
-      dueDate: dateOnly(body.data.dueDate),
-      userId,
-      paid: body.data.paid ?? false,
-    })
-    .returning();
+  const db = await getMongoDb();
+  const now = new Date();
+  const bill: BillRecord = {
+    id: await nextId("bills"),
+    userId,
+    name: body.data.name,
+    amount: body.data.amount,
+    dueDate: dateOnly(body.data.dueDate),
+    frequency: body.data.frequency,
+    paid: body.data.paid ?? false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.collection<BillRecord>("bills").insertOne(bill);
   res.status(201).json(CreateBillResponse.parse(billView(bill)));
 });
 
@@ -196,15 +303,20 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid bill update" });
     return;
   }
-  const { dueDate, ...billUpdates } = body.data;
-  const [bill] = await db
-    .update(billsTable)
-    .set({
-      ...billUpdates,
-      ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
-    })
-    .where(and(eq(billsTable.id, params.data.id), eq(billsTable.userId, userId)))
-    .returning();
+  const { dueDate, ...rest } = body.data;
+  const db = await getMongoDb();
+  const bills = db.collection<BillRecord>("bills");
+  await bills.updateOne(
+    { id: params.data.id, userId },
+    {
+      $set: {
+        ...defined(rest),
+        ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
+        updatedAt: new Date(),
+      },
+    },
+  );
+  const bill = await bills.findOne({ id: params.data.id, userId });
   if (!bill) {
     res.status(404).json({ error: "Bill not found" });
     return;
@@ -220,11 +332,11 @@ router.delete("/bills/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [bill] = await db
-    .delete(billsTable)
-    .where(and(eq(billsTable.id, params.data.id), eq(billsTable.userId, userId)))
-    .returning();
-  if (!bill) {
+  const db = await getMongoDb();
+  const result = await db
+    .collection<BillRecord>("bills")
+    .deleteOne({ id: params.data.id, userId });
+  if (!result.deletedCount) {
     res.status(404).json({ error: "Bill not found" });
     return;
   }
@@ -234,11 +346,12 @@ router.delete("/bills/:id", async (req, res): Promise<void> => {
 router.get("/debts", async (req, res): Promise<void> => {
   const userId = requireUserId(req, res);
   if (!userId) return;
+  const db = await getMongoDb();
   const debts = await db
-    .select()
-    .from(debtsTable)
-    .where(eq(debtsTable.userId, userId))
-    .orderBy(debtsTable.dueDate);
+    .collection<DebtRecord>("debts")
+    .find({ userId })
+    .sort({ dueDate: 1 })
+    .toArray();
   res.json(ListDebtsResponse.parse(debts.map(debtView)));
 });
 
@@ -250,10 +363,20 @@ router.post("/debts", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid debt details" });
     return;
   }
-  const [debt] = await db
-    .insert(debtsTable)
-    .values({ ...body.data, dueDate: dateOnly(body.data.dueDate), userId })
-    .returning();
+  const db = await getMongoDb();
+  const now = new Date();
+  const debt: DebtRecord = {
+    id: await nextId("debts"),
+    userId,
+    name: body.data.name,
+    totalAmount: body.data.totalAmount,
+    remainingAmount: body.data.remainingAmount,
+    monthlyPayment: body.data.monthlyPayment,
+    dueDate: dateOnly(body.data.dueDate),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.collection<DebtRecord>("debts").insertOne(debt);
   res.status(201).json(CreateDebtResponse.parse(debtView(debt)));
 });
 
@@ -266,15 +389,20 @@ router.patch("/debts/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid debt update" });
     return;
   }
-  const { dueDate, ...debtUpdates } = body.data;
-  const [debt] = await db
-    .update(debtsTable)
-    .set({
-      ...debtUpdates,
-      ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
-    })
-    .where(and(eq(debtsTable.id, params.data.id), eq(debtsTable.userId, userId)))
-    .returning();
+  const { dueDate, ...rest } = body.data;
+  const db = await getMongoDb();
+  const debts = db.collection<DebtRecord>("debts");
+  await debts.updateOne(
+    { id: params.data.id, userId },
+    {
+      $set: {
+        ...defined(rest),
+        ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
+        updatedAt: new Date(),
+      },
+    },
+  );
+  const debt = await debts.findOne({ id: params.data.id, userId });
   if (!debt) {
     res.status(404).json({ error: "Debt not found" });
     return;
@@ -290,11 +418,11 @@ router.delete("/debts/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [debt] = await db
-    .delete(debtsTable)
-    .where(and(eq(debtsTable.id, params.data.id), eq(debtsTable.userId, userId)))
-    .returning();
-  if (!debt) {
+  const db = await getMongoDb();
+  const result = await db
+    .collection<DebtRecord>("debts")
+    .deleteOne({ id: params.data.id, userId });
+  if (!result.deletedCount) {
     res.status(404).json({ error: "Debt not found" });
     return;
   }
@@ -310,32 +438,44 @@ router.post("/debts/:id/payments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid payment" });
     return;
   }
-  const [existing] = await db
-    .select()
-    .from(debtsTable)
-    .where(and(eq(debtsTable.id, params.data.id), eq(debtsTable.userId, userId)));
+  const db = await getMongoDb();
+  const debts = db.collection<DebtRecord>("debts");
+  const existing = await debts.findOne({ id: params.data.id, userId });
   if (!existing) {
     res.status(404).json({ error: "Debt not found" });
     return;
   }
   const payment = Math.min(body.data.amount, existing.remainingAmount);
-  const [debt] = await db
-    .update(debtsTable)
-    .set({ remainingAmount: Math.max(0, existing.remainingAmount - payment) })
-    .where(and(eq(debtsTable.id, existing.id), eq(debtsTable.userId, userId)))
-    .returning();
-  await db.insert(debtPaymentsTable).values({ debtId: debt.id, userId, amount: payment });
+  await debts.updateOne(
+    { id: existing.id, userId },
+    {
+      $set: {
+        remainingAmount: Math.max(0, existing.remainingAmount - payment),
+        updatedAt: new Date(),
+      },
+    },
+  );
+  await db.collection("debt_payments").insertOne({
+    id: await nextId("debt_payments"),
+    debtId: existing.id,
+    userId,
+    amount: payment,
+    createdAt: new Date(),
+  });
+  const debt = await debts.findOne({ id: existing.id, userId });
+  if (!debt) throw new Error("Debt disappeared after payment");
   res.json(RecordDebtPaymentResponse.parse(debtView(debt)));
 });
 
 router.get("/savings-goals", async (req, res): Promise<void> => {
   const userId = requireUserId(req, res);
   if (!userId) return;
+  const db = await getMongoDb();
   const goals = await db
-    .select()
-    .from(savingsGoalsTable)
-    .where(eq(savingsGoalsTable.userId, userId))
-    .orderBy(savingsGoalsTable.targetDate);
+    .collection<SavingsGoalRecord>("savings_goals")
+    .find({ userId })
+    .sort({ targetDate: 1 })
+    .toArray();
   res.json(ListSavingsGoalsResponse.parse(goals.map(savingsView)));
 });
 
@@ -347,10 +487,19 @@ router.post("/savings-goals", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid savings goal" });
     return;
   }
-  const [goal] = await db
-    .insert(savingsGoalsTable)
-    .values({ ...body.data, targetDate: dateOnly(body.data.targetDate), userId })
-    .returning();
+  const db = await getMongoDb();
+  const now = new Date();
+  const goal: SavingsGoalRecord = {
+    id: await nextId("savings_goals"),
+    userId,
+    name: body.data.name,
+    targetAmount: body.data.targetAmount,
+    currentAmount: body.data.currentAmount,
+    targetDate: dateOnly(body.data.targetDate),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.collection<SavingsGoalRecord>("savings_goals").insertOne(goal);
   res.status(201).json(CreateSavingsGoalResponse.parse(savingsView(goal)));
 });
 
@@ -363,20 +512,20 @@ router.patch("/savings-goals/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid savings goal update" });
     return;
   }
-  const { targetDate, ...goalUpdates } = body.data;
-  const [goal] = await db
-    .update(savingsGoalsTable)
-    .set({
-      ...goalUpdates,
-      ...(targetDate ? { targetDate: dateOnly(targetDate) } : {}),
-    })
-    .where(
-      and(
-        eq(savingsGoalsTable.id, params.data.id),
-        eq(savingsGoalsTable.userId, userId),
-      ),
-    )
-    .returning();
+  const { targetDate, ...rest } = body.data;
+  const db = await getMongoDb();
+  const goals = db.collection<SavingsGoalRecord>("savings_goals");
+  await goals.updateOne(
+    { id: params.data.id, userId },
+    {
+      $set: {
+        ...defined(rest),
+        ...(targetDate ? { targetDate: dateOnly(targetDate) } : {}),
+        updatedAt: new Date(),
+      },
+    },
+  );
+  const goal = await goals.findOne({ id: params.data.id, userId });
   if (!goal) {
     res.status(404).json({ error: "Savings goal not found" });
     return;
@@ -392,16 +541,11 @@ router.delete("/savings-goals/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [goal] = await db
-    .delete(savingsGoalsTable)
-    .where(
-      and(
-        eq(savingsGoalsTable.id, params.data.id),
-        eq(savingsGoalsTable.userId, userId),
-      ),
-    )
-    .returning();
-  if (!goal) {
+  const db = await getMongoDb();
+  const result = await db
+    .collection<SavingsGoalRecord>("savings_goals")
+    .deleteOne({ id: params.data.id, userId });
+  if (!result.deletedCount) {
     res.status(404).json({ error: "Savings goal not found" });
     return;
   }
@@ -417,54 +561,42 @@ router.post("/savings-goals/:id/contributions", async (req, res): Promise<void> 
     res.status(400).json({ error: "Invalid contribution" });
     return;
   }
-  const [existing] = await db
-    .select()
-    .from(savingsGoalsTable)
-    .where(
-      and(
-        eq(savingsGoalsTable.id, params.data.id),
-        eq(savingsGoalsTable.userId, userId),
-      ),
-    );
+  const db = await getMongoDb();
+  const goals = db.collection<SavingsGoalRecord>("savings_goals");
+  const existing = await goals.findOne({ id: params.data.id, userId });
   if (!existing) {
     res.status(404).json({ error: "Savings goal not found" });
     return;
   }
-  const amount = Math.min(body.data.amount, Math.max(0, existing.targetAmount - existing.currentAmount));
-  const [goal] = await db
-    .update(savingsGoalsTable)
-    .set({ currentAmount: existing.currentAmount + amount })
-    .where(
-      and(eq(savingsGoalsTable.id, existing.id), eq(savingsGoalsTable.userId, userId)),
-    )
-    .returning();
-  await db
-    .insert(savingsContributionsTable)
-    .values({ goalId: goal.id, userId, amount });
+  const amount = Math.min(
+    body.data.amount,
+    Math.max(0, existing.targetAmount - existing.currentAmount),
+  );
+  await goals.updateOne(
+    { id: existing.id, userId },
+    {
+      $set: {
+        currentAmount: existing.currentAmount + amount,
+        updatedAt: new Date(),
+      },
+    },
+  );
+  await db.collection("savings_contributions").insertOne({
+    id: await nextId("savings_contributions"),
+    goalId: existing.id,
+    userId,
+    amount,
+    createdAt: new Date(),
+  });
+  const goal = await goals.findOne({ id: existing.id, userId });
+  if (!goal) throw new Error("Savings goal disappeared after contribution");
   res.json(AddSavingsContributionResponse.parse(savingsView(goal)));
 });
 
 router.get("/dashboard", async (req, res): Promise<void> => {
   const userId = requireUserId(req, res);
   if (!userId) return;
-  const [profiles, bills, debts, goals] = await Promise.all([
-    db.select().from(userProfilesTable).where(eq(userProfilesTable.userId, userId)),
-    db
-      .select()
-      .from(billsTable)
-      .where(eq(billsTable.userId, userId))
-      .orderBy(desc(billsTable.createdAt)),
-    db
-      .select()
-      .from(debtsTable)
-      .where(eq(debtsTable.userId, userId))
-      .orderBy(desc(debtsTable.createdAt)),
-    db
-      .select()
-      .from(savingsGoalsTable)
-      .where(eq(savingsGoalsTable.userId, userId))
-      .orderBy(desc(savingsGoalsTable.createdAt)),
-  ]);
+  const { profile, bills, debts, goals } = await loadFinance(userId);
   const today = new Date();
   const todayKey = today.toISOString().slice(0, 10);
   const soon = new Date(today);
@@ -473,7 +605,7 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   const unpaid = bills.filter((bill) => !bill.paid);
   const currentSavings = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
   const savingsTarget = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
-  const activity = [
+  const recentActivity = [
     ...bills.slice(0, 2).map((bill) => ({
       id: `bill-${bill.id}`,
       title: bill.paid ? "Bill paid" : "Bill added",
@@ -498,21 +630,90 @@ router.get("/dashboard", async (req, res): Promise<void> => {
   ]
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .slice(0, 5);
-  const nextBill = [...unpaid].sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+  const nextBill = [...unpaid].sort((a, b) =>
+    a.dueDate.localeCompare(b.dueDate),
+  )[0];
   res.json(
     GetDashboardResponse.parse({
-      monthlyIncome: profiles[0]?.monthlyIncome ?? 0,
+      monthlyIncome: profile?.monthlyIncome ?? 0,
       upcomingBills: unpaid.reduce((sum, bill) => sum + bill.amount, 0),
-      totalRemainingDebt: debts.reduce((sum, debt) => sum + debt.remainingAmount, 0),
+      totalRemainingDebt: debts.reduce(
+        (sum, debt) => sum + debt.remainingAmount,
+        0,
+      ),
       currentSavings,
-      savingsProgress: savingsTarget > 0 ? (currentSavings / savingsTarget) * 100 : 0,
+      savingsProgress:
+        savingsTarget > 0 ? (currentSavings / savingsTarget) * 100 : 0,
       billsDueSoon: unpaid.filter(
         (bill) => bill.dueDate >= todayKey && bill.dueDate <= soonKey,
       ).length,
       nextBill: nextBill?.name ?? null,
-      recentActivity: activity,
+      recentActivity,
     }),
   );
+});
+
+router.post("/assistant", async (req, res): Promise<void> => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+  const body = AskFinancialAssistantBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is required");
+  const { profile, bills, debts, goals } = await loadFinance(userId);
+  const currency = profile?.preferredCurrency ?? "SAR";
+  const language = body.data.language === "ar" ? "Arabic" : "English";
+  const financeSnapshot = {
+    currency,
+    monthlyIncome: profile?.monthlyIncome ?? 0,
+    bills: bills.map(({ name, amount, dueDate, frequency, paid }) => ({
+      name,
+      amount,
+      dueDate,
+      frequency,
+      paid,
+    })),
+    debts: debts.map(
+      ({ name, totalAmount, remainingAmount, monthlyPayment, dueDate }) => ({
+        name,
+        totalAmount,
+        remainingAmount,
+        monthlyPayment,
+        dueDate,
+      }),
+    ),
+    savingsGoals: goals.map(
+      ({ name, targetAmount, currentAmount, targetDate }) => ({
+        name,
+        targetAmount,
+        currentAmount,
+        targetDate,
+      }),
+    ),
+  };
+  const ai = new GoogleGenAI({ apiKey });
+  const result = await ai.models.generateContent({
+    model: "gemini-3.6-flash",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `You are Mizan's personal financial organization assistant. Answer only from the supplied finance snapshot. Do not provide investment, legal, tax, lending, or professional financial advice. Do not invent missing values. Keep the answer concise, practical, and in ${language}. If the question is unrelated to the user's bills, debts, savings, income, or cash-flow organization, politely explain the scope.\n\nFinance snapshot:\n${JSON.stringify(financeSnapshot)}\n\nUser question:\n${body.data.question}`,
+          },
+        ],
+      },
+    ],
+  });
+  const answer =
+    result.text?.trim() ||
+    (body.data.language === "ar"
+      ? "تعذر إنشاء إجابة الآن. حاول مرة أخرى."
+      : "I could not create an answer right now. Please try again.");
+  res.json(AskFinancialAssistantResponse.parse({ answer }));
 });
 
 export default router;

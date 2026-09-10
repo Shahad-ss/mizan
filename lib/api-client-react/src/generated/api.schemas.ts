@@ -151,3 +151,16 @@ export interface SavingsContributionInput {
   amount: number;
 }
 
+export interface FinancialAssistantInput {
+  /**
+     * @minLength 2
+     * @maxLength 500
+     */
+  question: string;
+  language?: string;
+}
+
+export interface FinancialAssistantAnswer {
+  answer: string;
+}
+

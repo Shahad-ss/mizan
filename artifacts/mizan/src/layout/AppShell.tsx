@@ -5,6 +5,7 @@ import { useClerk } from '@clerk/react';
 import { Button } from '@/components/ui';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { FloatingFinancialAssistant } from '@/components/FinancialAssistant';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -88,6 +89,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+
+      {/* Global Financial Assistant Widget */}
+      <FloatingFinancialAssistant />
     </div>
   );
 }

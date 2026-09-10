@@ -2,6 +2,7 @@ import { useGetDashboard, useGetProfile } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle, Progress, Skeleton } from '@/components/ui';
 import { Wallet, Receipt, Landmark, PiggyBank, Calendar, ArrowUpRight } from 'lucide-react';
 import { useLanguage } from '@/providers/language-provider';
+import { DashboardFinancialAssistant } from '@/components/FinancialAssistant';
 
 export default function Dashboard() {
   const { t, dir } = useLanguage();
@@ -87,33 +88,39 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="pt-4">
-        <h2 className="text-2xl font-serif font-bold mb-6">{t('recent_activity')}</h2>
-        {dashboard.recentActivity && dashboard.recentActivity.length > 0 ? (
-          <div className="space-y-4">
-            {dashboard.recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border shadow-sm transition-all hover:shadow-md">
-                <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                  <ArrowUpRight className="h-5 w-5 text-secondary-foreground" />
+      <div className="pt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-2xl font-serif font-bold mb-6">{t('recent_activity')}</h2>
+          {dashboard.recentActivity && dashboard.recentActivity.length > 0 ? (
+            <div className="space-y-4">
+              {dashboard.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border shadow-sm transition-all hover:shadow-md">
+                  <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                    <ArrowUpRight className="h-5 w-5 text-secondary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{activity.title}</p>
+                    <p className="text-sm text-muted-foreground truncate">{activity.detail}</p>
+                  </div>
+                  <div className="text-sm text-muted-foreground whitespace-nowrap">
+                    {new Date(activity.occurredAt).toLocaleDateString(dir === 'rtl' ? 'ar' : 'en-US', { month: 'short', day: 'numeric' })}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">{activity.title}</p>
-                  <p className="text-sm text-muted-foreground truncate">{activity.detail}</p>
-                </div>
-                <div className="text-sm text-muted-foreground whitespace-nowrap">
-                  {new Date(activity.occurredAt).toLocaleDateString(dir === 'rtl' ? 'ar' : 'en-US', { month: 'short', day: 'numeric' })}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Card className="rounded-3xl border-dashed">
-            <CardContent className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center">
-              <Calendar className="h-12 w-12 opacity-20 mb-4" />
-              <p className="text-lg">{t('no_activity')}</p>
-            </CardContent>
-          </Card>
-        )}
+              ))}
+            </div>
+          ) : (
+            <Card className="rounded-3xl border-dashed">
+              <CardContent className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center">
+                <Calendar className="h-12 w-12 opacity-20 mb-4" />
+                <p className="text-lg">{t('no_activity')}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+        
+        <div className="space-y-6">
+          <DashboardFinancialAssistant />
+        </div>
       </div>
     </div>
   );

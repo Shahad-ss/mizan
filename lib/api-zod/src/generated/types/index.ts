@@ -15,6 +15,8 @@ export * from './debt';
 export * from './debtInput';
 export * from './debtPaymentInput';
 export * from './debtUpdate';
+export * from './financialAssistantAnswer';
+export * from './financialAssistantInput';
 export * from './healthStatus';
 export * from './profile';
 export * from './profileUpdate';

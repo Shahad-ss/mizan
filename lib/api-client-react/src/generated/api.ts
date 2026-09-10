@@ -28,6 +28,8 @@ import type {
   DebtInput,
   DebtPaymentInput,
   DebtUpdate,
+  FinancialAssistantAnswer,
+  FinancialAssistantInput,
   HealthStatus,
   Profile,
   ProfileUpdate,
@@ -1382,5 +1384,76 @@ export const useAddSavingsContribution = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAddSavingsContributionMutationOptions(options));
+    }
+
+export const getAskFinancialAssistantUrl = () => {
+
+
+
+
+  return `/api/assistant`
+}
+
+/**
+ * @summary Ask a question about the signed-in user's finances
+ */
+export const askFinancialAssistant = async (financialAssistantInput: FinancialAssistantInput, options?: Parameters<typeof customFetch>[1]): Promise<FinancialAssistantAnswer> => {
+
+  return customFetch<FinancialAssistantAnswer>(getAskFinancialAssistantUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(financialAssistantInput)
+  }
+);}
+
+
+
+
+
+export const getAskFinancialAssistantMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof askFinancialAssistant>>, TError,{data: BodyType<FinancialAssistantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof askFinancialAssistant>>, TError,{data: BodyType<FinancialAssistantInput>}, TContext> => {
+
+const mutationKey = ['askFinancialAssistant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof askFinancialAssistant>>, {data: BodyType<FinancialAssistantInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  askFinancialAssistant(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AskFinancialAssistantMutationResult = NonNullable<Awaited<ReturnType<typeof askFinancialAssistant>>>
+    export type AskFinancialAssistantMutationBody = BodyType<FinancialAssistantInput>
+    export type AskFinancialAssistantMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Ask a question about the signed-in user's finances
+ */
+export const useAskFinancialAssistant = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof askFinancialAssistant>>, TError,{data: BodyType<FinancialAssistantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof askFinancialAssistant>>,
+        TError,
+        {data: BodyType<FinancialAssistantInput>},
+        TContext
+      > => {
+      return useMutation(getAskFinancialAssistantMutationOptions(options));
     }
 

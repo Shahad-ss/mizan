@@ -388,3 +388,21 @@ export const AddSavingsContributionResponse = zod.object({
 })
 
 
+/**
+ * @summary Ask a question about the signed-in user's finances
+ */
+export const askFinancialAssistantBodyQuestionMin = 2;
+export const askFinancialAssistantBodyQuestionMax = 500;
+
+
+
+export const AskFinancialAssistantBody = zod.object({
+  "question": zod.string().min(askFinancialAssistantBodyQuestionMin).max(askFinancialAssistantBodyQuestionMax),
+  "language": zod.string().optional()
+})
+
+export const AskFinancialAssistantResponse = zod.object({
+  "answer": zod.string()
+})
+
+

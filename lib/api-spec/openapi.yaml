@@ -20,6 +20,8 @@ tags:
     description: Debt tracking
   - name: savings
     description: Savings goal tracking
+  - name: assistant
+    description: User-scoped financial guidance
 paths:
   /healthz:
     get:
@@ -295,6 +297,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SavingsGoal"
+  /assistant:
+    post:
+      operationId: askFinancialAssistant
+      tags: [assistant]
+      summary: Ask a question about the signed-in user's finances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FinancialAssistantInput"
+      responses:
+        "200":
+          description: Assistant answer based on the user's own financial data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialAssistantAnswer"
 components:
   parameters:
     Id:
@@ -462,4 +482,20 @@ components:
       required: [amount]
       properties:
         amount: { type: number, minimum: 0.01 }
+    FinancialAssistantInput:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 2
+          maxLength: 500
+        language:
+          type: string
+    FinancialAssistantAnswer:
+      type: object
+      required: [answer]
+      properties:
+        answer:
+          type: string
 
