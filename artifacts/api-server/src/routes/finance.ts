@@ -35,8 +35,9 @@ import {
   UpdateSavingsGoalParams,
   UpdateSavingsGoalResponse,
 } from "@workspace/api-zod";
+import type { ClientSession } from "mongodb";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { getMongoDb } from "../lib/mongo";
+import { getMongoDb, withMongoTransaction } from "../lib/mongo";
 
 interface ProfileRecord {
   userId: string;
@@ -113,12 +114,12 @@ function defined<T extends object>(value: T): Partial<T> {
   ) as Partial<T>;
 }
 
-async function nextId(name: string): Promise<number> {
+async function nextId(name: string, session?: ClientSession): Promise<number> {
   const db = await getMongoDb();
   const counter = await db.collection<CounterRecord>("counters").findOneAndUpdate(
     { _id: name },
     { $inc: { seq: 1 } },
-    { upsert: true, returnDocument: "after" },
+    { upsert: true, returnDocument: "after", session },
   );
   if (!counter) throw new Error(`Unable to allocate ${name} id`);
   return counter.seq;
@@ -227,24 +228,28 @@ router.patch("/profile", async (req, res): Promise<void> => {
   }
   const db = await getMongoDb();
   const profiles = db.collection<ProfileRecord>("profiles");
-  const existing = await profiles.findOne({ userId });
   const now = new Date();
-  if (existing) {
-    await profiles.updateOne(
-      { userId },
-      { $set: { ...defined(body.data), updatedAt: now } },
-    );
-  } else {
-    await profiles.insertOne({
-      userId,
-      monthlyIncome: body.data.monthlyIncome ?? 0,
-      preferredCurrency: body.data.preferredCurrency ?? "SAR",
-      language: body.data.language ?? "en",
-      theme: body.data.theme ?? "light",
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
+  await profiles.updateOne(
+    { userId },
+    [
+      {
+        $set: {
+          userId,
+          monthlyIncome:
+            body.data.monthlyIncome ?? { $ifNull: ["$monthlyIncome", 0] },
+          preferredCurrency:
+            body.data.preferredCurrency ??
+            { $ifNull: ["$preferredCurrency", "SAR"] },
+          language:
+            body.data.language ?? { $ifNull: ["$language", "en"] },
+          theme: body.data.theme ?? { $ifNull: ["$theme", "light"] },
+          createdAt: { $ifNull: ["$createdAt", now] },
+          updatedAt: now,
+        },
+      },
+    ],
+    { upsert: true },
+  );
   const profile = await profiles.findOne({ userId });
   res.json(
     UpdateProfileResponse.parse({
@@ -390,19 +395,40 @@ router.patch("/debts/:id", async (req, res): Promise<void> => {
     return;
   }
   const { dueDate, ...rest } = body.data;
-  const db = await getMongoDb();
-  const debts = db.collection<DebtRecord>("debts");
-  await debts.updateOne(
-    { id: params.data.id, userId },
-    {
-      $set: {
-        ...defined(rest),
-        ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
-        updatedAt: new Date(),
+  let invalidState = false;
+  const debt = await withMongoTransaction(async (db, session) => {
+    const debts = db.collection<DebtRecord>("debts");
+    const existing = await debts.findOne(
+      { id: params.data.id, userId },
+      { session },
+    );
+    if (!existing) return null;
+    const merged = {
+      ...existing,
+      ...defined(rest),
+      ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
+    };
+    if (merged.remainingAmount > merged.totalAmount) {
+      invalidState = true;
+      return null;
+    }
+    await debts.updateOne(
+      { id: params.data.id, userId },
+      {
+        $set: {
+          ...defined(rest),
+          ...(dueDate ? { dueDate: dateOnly(dueDate) } : {}),
+          updatedAt: new Date(),
+        },
       },
-    },
-  );
-  const debt = await debts.findOne({ id: params.data.id, userId });
+      { session },
+    );
+    return debts.findOne({ id: params.data.id, userId }, { session });
+  });
+  if (invalidState) {
+    res.status(400).json({ error: "Remaining debt cannot exceed total debt" });
+    return;
+  }
   if (!debt) {
     res.status(404).json({ error: "Debt not found" });
     return;
@@ -438,32 +464,40 @@ router.post("/debts/:id/payments", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid payment" });
     return;
   }
-  const db = await getMongoDb();
-  const debts = db.collection<DebtRecord>("debts");
-  const existing = await debts.findOne({ id: params.data.id, userId });
-  if (!existing) {
+  const debt = await withMongoTransaction(async (db, session) => {
+    const debts = db.collection<DebtRecord>("debts");
+    const existing = await debts.findOne(
+      { id: params.data.id, userId },
+      { session },
+    );
+    if (!existing) return null;
+    const payment = Math.min(body.data.amount, existing.remainingAmount);
+    await debts.updateOne(
+      { id: existing.id, userId },
+      {
+        $set: {
+          remainingAmount: Math.max(0, existing.remainingAmount - payment),
+          updatedAt: new Date(),
+        },
+      },
+      { session },
+    );
+    await db.collection("debt_payments").insertOne(
+      {
+        id: await nextId("debt_payments", session),
+        debtId: existing.id,
+        userId,
+        amount: payment,
+        createdAt: new Date(),
+      },
+      { session },
+    );
+    return debts.findOne({ id: existing.id, userId }, { session });
+  });
+  if (!debt) {
     res.status(404).json({ error: "Debt not found" });
     return;
   }
-  const payment = Math.min(body.data.amount, existing.remainingAmount);
-  await debts.updateOne(
-    { id: existing.id, userId },
-    {
-      $set: {
-        remainingAmount: Math.max(0, existing.remainingAmount - payment),
-        updatedAt: new Date(),
-      },
-    },
-  );
-  await db.collection("debt_payments").insertOne({
-    id: await nextId("debt_payments"),
-    debtId: existing.id,
-    userId,
-    amount: payment,
-    createdAt: new Date(),
-  });
-  const debt = await debts.findOne({ id: existing.id, userId });
-  if (!debt) throw new Error("Debt disappeared after payment");
   res.json(RecordDebtPaymentResponse.parse(debtView(debt)));
 });
 
@@ -513,19 +547,40 @@ router.patch("/savings-goals/:id", async (req, res): Promise<void> => {
     return;
   }
   const { targetDate, ...rest } = body.data;
-  const db = await getMongoDb();
-  const goals = db.collection<SavingsGoalRecord>("savings_goals");
-  await goals.updateOne(
-    { id: params.data.id, userId },
-    {
-      $set: {
-        ...defined(rest),
-        ...(targetDate ? { targetDate: dateOnly(targetDate) } : {}),
-        updatedAt: new Date(),
+  let invalidState = false;
+  const goal = await withMongoTransaction(async (db, session) => {
+    const goals = db.collection<SavingsGoalRecord>("savings_goals");
+    const existing = await goals.findOne(
+      { id: params.data.id, userId },
+      { session },
+    );
+    if (!existing) return null;
+    const merged = {
+      ...existing,
+      ...defined(rest),
+      ...(targetDate ? { targetDate: dateOnly(targetDate) } : {}),
+    };
+    if (merged.currentAmount > merged.targetAmount) {
+      invalidState = true;
+      return null;
+    }
+    await goals.updateOne(
+      { id: params.data.id, userId },
+      {
+        $set: {
+          ...defined(rest),
+          ...(targetDate ? { targetDate: dateOnly(targetDate) } : {}),
+          updatedAt: new Date(),
+        },
       },
-    },
-  );
-  const goal = await goals.findOne({ id: params.data.id, userId });
+      { session },
+    );
+    return goals.findOne({ id: params.data.id, userId }, { session });
+  });
+  if (invalidState) {
+    res.status(400).json({ error: "Current savings cannot exceed the target" });
+    return;
+  }
   if (!goal) {
     res.status(404).json({ error: "Savings goal not found" });
     return;
@@ -561,35 +616,43 @@ router.post("/savings-goals/:id/contributions", async (req, res): Promise<void> 
     res.status(400).json({ error: "Invalid contribution" });
     return;
   }
-  const db = await getMongoDb();
-  const goals = db.collection<SavingsGoalRecord>("savings_goals");
-  const existing = await goals.findOne({ id: params.data.id, userId });
-  if (!existing) {
+  const goal = await withMongoTransaction(async (db, session) => {
+    const goals = db.collection<SavingsGoalRecord>("savings_goals");
+    const existing = await goals.findOne(
+      { id: params.data.id, userId },
+      { session },
+    );
+    if (!existing) return null;
+    const amount = Math.min(
+      body.data.amount,
+      Math.max(0, existing.targetAmount - existing.currentAmount),
+    );
+    await goals.updateOne(
+      { id: existing.id, userId },
+      {
+        $set: {
+          currentAmount: existing.currentAmount + amount,
+          updatedAt: new Date(),
+        },
+      },
+      { session },
+    );
+    await db.collection("savings_contributions").insertOne(
+      {
+        id: await nextId("savings_contributions", session),
+        goalId: existing.id,
+        userId,
+        amount,
+        createdAt: new Date(),
+      },
+      { session },
+    );
+    return goals.findOne({ id: existing.id, userId }, { session });
+  });
+  if (!goal) {
     res.status(404).json({ error: "Savings goal not found" });
     return;
   }
-  const amount = Math.min(
-    body.data.amount,
-    Math.max(0, existing.targetAmount - existing.currentAmount),
-  );
-  await goals.updateOne(
-    { id: existing.id, userId },
-    {
-      $set: {
-        currentAmount: existing.currentAmount + amount,
-        updatedAt: new Date(),
-      },
-    },
-  );
-  await db.collection("savings_contributions").insertOne({
-    id: await nextId("savings_contributions"),
-    goalId: existing.id,
-    userId,
-    amount,
-    createdAt: new Date(),
-  });
-  const goal = await goals.findOne({ id: existing.id, userId });
-  if (!goal) throw new Error("Savings goal disappeared after contribution");
   res.json(AddSavingsContributionResponse.parse(savingsView(goal)));
 });
 

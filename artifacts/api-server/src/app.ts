@@ -33,7 +33,22 @@ app.use(
   }),
 );
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-app.use(cors({ credentials: true, origin: true }));
+app.use((req, res, next) =>
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      try {
+        callback(null, new URL(origin).host === req.get("host"));
+      } catch {
+        callback(null, false);
+      }
+    },
+  })(req, res, next),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(

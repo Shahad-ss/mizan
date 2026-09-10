@@ -1,18 +1,35 @@
-import { Db, MongoClient } from "mongodb";
+import { Db, MongoClient, type ClientSession } from "mongodb";
 
+let clientPromise: Promise<MongoClient> | undefined;
 let dbPromise: Promise<Db> | undefined;
 
-export function getMongoDb(): Promise<Db> {
-  if (!dbPromise) {
-    const uri = process.env.MONGODB_URI;
-    if (!uri) {
+export function getMongoClient(): Promise<MongoClient> {
+  if (!clientPromise) {
+    const username = process.env.MONGODB_USERNAME;
+    const password = process.env.MONGODB_PASSWORD;
+    const configuredUri = process.env.MONGODB_URI;
+    if (!configuredUri) {
       throw new Error("MONGODB_URI is required");
     }
 
-    dbPromise = MongoClient.connect(uri, {
+    const uri = new URL(configuredUri);
+    if (username && password) {
+      uri.username = username;
+      uri.password = password;
+    }
+
+    clientPromise = MongoClient.connect(uri.toString(), {
       appName: "Mizan",
       maxPoolSize: 10,
-    }).then(async (client) => {
+    });
+  }
+
+  return clientPromise;
+}
+
+export function getMongoDb(): Promise<Db> {
+  if (!dbPromise) {
+    dbPromise = getMongoClient().then(async (client) => {
       const db = client.db("mizan");
       await Promise.all([
         db.collection("profiles").createIndex({ userId: 1 }, { unique: true }),
@@ -27,4 +44,23 @@ export function getMongoDb(): Promise<Db> {
   }
 
   return dbPromise;
+}
+
+export async function withMongoTransaction<T>(
+  operation: (db: Db, session: ClientSession) => Promise<T>,
+): Promise<T> {
+  const client = await getMongoClient();
+  const session = client.startSession();
+  try {
+    let result: T | undefined;
+    await session.withTransaction(async () => {
+      result = await operation(client.db("mizan"), session);
+    });
+    if (result === undefined) {
+      throw new Error("MongoDB transaction completed without a result");
+    }
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
